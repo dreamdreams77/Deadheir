@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deadheir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #e9dfc8;
+    --ink-dim: #b9ab8e;
+    --gold: #f0c987;
+    --panel: rgba(14, 14, 24, 0.82);
+    --edge: rgba(240, 201, 135, 0.35);
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --fell: 'IM Fell English', Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #04050b; overflow: hidden; color: var(--ink); font-family: var(--serif); }
+  body { display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; touch-action: none; }
+  #stage { position: relative; }
+  canvas { display: block; }
+  .overlay { position: fixed; inset: 0; display: flex; pointer-events: none; }
+
+  /* title */
+  #title { flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 11vh; pointer-events: auto;
+    background: linear-gradient(to top, rgba(3,4,10,0.92) 0%, rgba(3,4,10,0.55) 35%, rgba(3,4,10,0) 70%); transition: opacity 1.6s ease; }
+  #title.hide { opacity: 0; pointer-events: none; }
+  #title h1 { font-family: var(--fell); font-weight: 400; font-size: clamp(54px, 10vw, 120px); letter-spacing: 0.18em; margin: 0;
+    color: #efe6d2; text-shadow: 0 0 30px rgba(170, 210, 255, 0.35), 0 4px 18px #000; padding-left: 0.18em; }
+  #title p { font-style: italic; font-size: clamp(17px, 2.2vw, 24px); color: var(--ink-dim); margin: 6px 16px 30px; text-align: center; max-width: 34em; }
+  .btn { pointer-events: auto; font-family: var(--fell); font-size: 22px; color: var(--gold); background: rgba(20, 18, 28, 0.6);
+    border: 1px solid var(--edge); padding: 10px 34px; cursor: pointer; letter-spacing: 0.08em; transition: background .2s, box-shadow .2s; }
+  .btn:hover:not(:disabled), .btn:focus-visible { background: rgba(60, 46, 30, 0.7); box-shadow: 0 0 22px rgba(240, 201, 135, 0.25); outline: none; }
+  .btn:disabled { opacity: 0.4; cursor: wait; }
+  #loading { margin-top: 14px; font-style: italic; color: var(--ink-dim); font-size: 16px; }
+  #loading.hide { visibility: hidden; }
+  .keys { margin-top: 18px; font-size: 15px; color: #8f8670; letter-spacing: 0.04em; text-align: center; padding: 0 16px; }
+
+  /* hud */
+  #hud { justify-content: space-between; align-items: flex-start; padding: 16px 18px; opacity: 0; transition: opacity 1.2s ease 0.6s; }
+  #hud.show { opacity: 1; }
+  #clues { font-family: var(--fell); font-size: 20px; color: var(--gold); text-shadow: 0 2px 8px #000; }
+  #hud .right { display: flex; gap: 10px; pointer-events: auto; }
+  #hud .btn { font-size: 16px; padding: 6px 16px; }
+
+  #toast { position: fixed; top: 16%; left: 50%; transform: translateX(-50%); font-family: var(--fell); font-size: clamp(20px, 2.6vw, 30px);
+    color: var(--gold); text-shadow: 0 0 18px rgba(240, 201, 135, 0.6), 0 2px 8px #000; opacity: 0; pointer-events: none; white-space: nowrap; }
+  #toast.show { animation: toast 3.4s ease forwards; }
+  @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 15%, 70% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+
+  /* dialog */
+  #dialog { position: fixed; left: 50%; bottom: 5vh; transform: translate(-50%, 20px); width: min(760px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--edge); padding: 22px 28px 18px; opacity: 0; pointer-events: none;
+    transition: opacity .35s ease, transform .35s ease; box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 40px rgba(240,201,135,0.05); cursor: pointer;
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  #dialog.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+  #dlg-title { font-family: var(--fell); font-size: 26px; color: var(--gold); margin: 0 0 8px; font-weight: 400; }
+  #dlg-text { font-size: clamp(18px, 2vw, 22px); line-height: 1.45; min-height: 3em; margin: 0; }
+  #dlg-more { text-align: right; color: var(--ink-dim); font-style: italic; font-size: 15px; margin-top: 6px; animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  #dlg-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  #dlg-choices button { font-family: var(--serif); font-size: 20px; text-align: left; color: var(--ink); background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(240,201,135,0.2); padding: 10px 16px; cursor: pointer; }
+  #dlg-choices button:hover, #dlg-choices button:focus-visible { border-color: var(--gold); color: var(--gold); outline: none; }
+
+  /* journal */
+  #journal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2,3,8,0.6);
+    opacity: 0; pointer-events: none; transition: opacity .3s; padding: 16px; }
+  #journal.show { opacity: 1; pointer-events: auto; }
+  #journal .page { width: min(620px, 100%); max-height: 90vh; overflow: auto; background: #d9ccad; color: #2a2116; padding: 28px 34px;
+    box-shadow: 0 20px 60px #000, inset 0 0 80px rgba(90, 60, 20, 0.45); border-radius: 2px; }
+  #journal h2 { font-family: var(--fell); font-weight: 400; font-size: 32px; margin: 0 0 14px; }
+  #journal ol { margin: 0; padding-left: 22px; }
+  #journal li { margin: 0 0 12px; font-size: 19px; line-height: 1.35; }
+  #journal li b { display: block; font-family: var(--fell); font-weight: 400; font-size: 21px; }
+  #journal li.unknown { opacity: 0.45; font-style: italic; }
+  #journal .btn { color: #2a2116; border-color: rgba(42,33,22,0.4); background: transparent; font-size: 17px; margin-top: 8px; }
+
+  /* ending */
+  #ending { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at center, rgba(8,8,16,0.75), rgba(2,2,6,0.97)); opacity: 0; pointer-events: none; transition: opacity 3s ease; padding: 24px; }
+  #ending.show { opacity: 1; pointer-events: auto; }
+  #ending h2 { font-family: var(--fell); font-weight: 400; font-size: clamp(38px, 6vw, 64px); color: var(--gold); margin: 0 0 18px; letter-spacing: 0.1em; }
+  #ending-text { max-width: 36em; font-size: clamp(18px, 2.2vw, 23px); line-height: 1.55; }
+  #ending .btn { margin-top: 24px; }
+
+  /* touch */
+  #touch { position: fixed; inset: auto 0 0 0; display: none; justify-content: space-between; padding: 0 16px 22px; pointer-events: none; }
+  body.touch #touch { display: flex; }
+  #touch .grp { display: flex; gap: 14px; pointer-events: auto; }
+  #touch button { width: 68px; height: 68px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(14,14,24,0.5); color: var(--gold);
+    font-size: 26px; touch-action: none; }
+  body.touch #dialog { bottom: 120px; }
+  @media (prefers-reduced-motion: reduce) { #dlg-more { animation: none; } #title, #ending { transition: none; } }
+</style>
+</head>
+<body>
+  <div id="stage"><canvas id="game" aria-label="Deadheir game scene"></canvas></div>
+
+  <div id="hud" class="overlay">
+    <div id="clues">Clues 0 / 5</div>
+    <div class="right">
+      <button class="btn" id="journal-btn">Journal</button>
+      <button class="btn" id="mute">Sound: on</button>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+  <div id="title" class="overlay">
+    <h1>DEADHEIR</h1>
+    <p>You were the heir of Vanehold until someone poisoned your wine. Now you walk the estate at night, and the house is keeping a secret.</p>
+    <button class="btn" id="begin" disabled>Rise</button>
+    <div id="loading">Painting the estate…</div>
+    <div class="keys">← → or A D to drift · E or Space to examine · J journal · M sound</div>
+  </div>
+
+  <div id="dialog" role="dialog" aria-live="polite">
+    <h3 id="dlg-title"></h3>
+    <p id="dlg-text"></p>
+    <div id="dlg-choices"></div>
+    <div id="dlg-more">continue ›</div>
+  </div>
+
+  <div id="journal">
+    <div class="page">
+      <h2>What the dead remember</h2>
+      <ol id="journal-list"></ol>
+      <button class="btn" id="journal-close">Close</button>
+    </div>
+  </div>
+
+  <div id="ending">
+    <h2>At Rest</h2>
+    <div id="ending-text"></div>
+    <button class="btn" id="again">Walk again</button>
+  </div>
+
+  <div id="touch">
+    <div class="grp"><button id="t-left" aria-label="Move left">◀</button><button id="t-right" aria-label="Move right">▶</button></div>
+    <div class="grp"><button id="t-act" aria-label="Examine">✦</button></div>
+  </div>
+
+  <script src="src/paint.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/story.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
