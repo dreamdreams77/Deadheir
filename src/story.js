@@ -78,3 +78,27 @@ const ENDINGS = {
   ],
   wrong: 'The name falls into silence. The house does not believe you. Think on what you have found.',
 };
+
+// Side quest: a rattling robot skeleton in a blue helmet, resting in the Vane mausoleum.
+const BONES = {
+  name: 'Blue Bones',
+  meet: [
+    'Rattle-rattle! A ghost! Easy there. I\'m not here to bust you.',
+    'Name\'s Blue Bones. Long ago a good doctor built me to stop a mad scientist\'s robots. I won, mostly. Then my power ran out, and I ended up in here, keeping the Vanes company.',
+    'When I fell, my three Energy Cells rolled out of my chest. Without them I can\'t even lift my buster.',
+    'One is up on the tallest headstone in the graveyard. One floats above the fountain. The shades dragged the last one off toward the cellar. Jump, glide, and bring them back?',
+  ],
+  waiting: n => `${n} of 3 Energy Cells. My knees are already rattling less! Keep looking: the headstone, the fountain, and the shades by the cellar.`,
+  done: [
+    'Click, whirr. FULL POWER! Look at that, my eyes are blue again.',
+    'Here, take this. A Bone Buster, refitted for a ghostly arm. Press F to fire. Hold F and let go for a charged shot. Those shades won\'t know what hit them.',
+    'One more thing. The night of the feast I saw a man come down the cellar steps with a ring of keys and two tins. He never noticed me. Nobody ever notices me.',
+  ],
+  after: [
+    'Go get \'em, ghost!',
+    'Three shots on screen at once. That\'s the rule. Don\'t ask me why.',
+    'If you see a mad scientist, you didn\'t see me.',
+  ],
+  cell: 'A humming capsule, warm to the touch. It feels like it belongs to someone.',
+  ending: 'In the mausoleum, a skeleton in a blue helmet raises his buster in salute.',
+};

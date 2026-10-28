@@ -19,6 +19,7 @@ const World = (() => {
     { id: 'far', f: 0.2, scale: 0.5, fog: [52, 60, 98], fogA: [0.34, 0.55] },
     { id: 'back', f: 0.4, scale: 0.6, fog: [42, 50, 84], fogA: [0.22, 0.42] },
     { id: 'mid', f: 0.66, scale: 0.8, fog: [32, 38, 66], fogA: [0.08, 0.24] },
+    { id: 'near', f: 0.84, scale: 0.9, fog: [24, 28, 52], fogA: [0.03, 0.14] },
     { id: 'ground', f: 1, scale: 1, fog: null },
     { id: 'fore', f: 1.45, scale: 0.28, fog: [6, 8, 16], fogA: [0.25, 0.1] },
   ];
@@ -131,6 +132,58 @@ const World = (() => {
   L.mid.front = (c, x0, x1) => cellsDo(3, 3, x0, x1, CELL, (r, a, b) =>
     P.grass(c, r, a, b, hillM, [205, 22, 14], { dens: 0.7, h: 16, rim: RIM, a: 0.8 }));
 
+
+  // ---------------------------------------------------------------- near grounds
+  // A layer just behind the path: hedges, broken columns, urns and roses.
+  const hillN = x => 586 - P.fbm(x * 0.006, 61) * 14;
+  L.near.terrain = (c, x0, x1) => band(c, 6, 1, x0, x1, hillN, [210, 22, 12], { n: 40, len: 18, w: 5, rimL: 12 });
+  L.near.front = (c, x0, x1) => cellsDo(6, 3, x0, x1, CELL, (r, a, b) =>
+    P.grass(c, r, a, b, hillN, [198, 22, 14], { dens: 0.9, h: 16, rim: [204, 32, 38], a: 0.8 }));
+
+  function brokenColumn(c, r, x, y) {
+    const h = 70 + r() * 90, w = 22, stone = [216, 10, 32];
+    P.paintFill(c, r, cc => {
+      cc.beginPath(); cc.moveTo(x - w / 2, y); cc.lineTo(x - w / 2, y - h);
+      for (let i = 0; i <= 4; i++) cc.lineTo(x - w / 2 + (i / 4) * w, y - h - (r() - 0.3) * 14);
+      cc.lineTo(x + w / 2, y); cc.closePath();
+    }, [x - w / 2, y - h - 14, w, h + 14], stone, { ang: 1.57, len: 14, w: 2, angJ: 0.05, lf: px => (px - x) * 1.4 });
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - w * 0.8, y - 10, w * 1.6, 10); }, [x - w * 0.8, y - 10, w * 1.6, 10], stone, { ang: 0, len: 10, w: 2 });
+    // fallen drum lying in the grass
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.ellipse(x + 34, y - 9, 24, 10, 0.05, 0, P.TAU); }, [x + 10, y - 20, 48, 22], stone, { ang: 0, len: 12, w: 2, lf: (px, py) => -(py - y + 9) * 1.5 });
+    P.clump(c, r, x - 4, y - h * 0.4, 16, [150, 24, 12], { a: 0.75, n: 10, hl: [185, 30, 36], hla: 0.3 });
+  }
+  function urn(c, r, x, y) {
+    const stone = [218, 10, 34];
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - 14, y - 50, 28, 50); }, [x - 14, y - 50, 28, 50], stone, { ang: 1.57, len: 10, w: 2, lf: px => (px - x) * 0.8 });
+    P.paintFill(c, r, cc => {
+      cc.beginPath(); cc.moveTo(x - 10, y - 50); cc.quadraticCurveTo(x - 26, y - 70, x - 18, y - 88);
+      cc.lineTo(x + 18, y - 88); cc.quadraticCurveTo(x + 26, y - 70, x + 10, y - 50); cc.closePath();
+    }, [x - 26, y - 90, 52, 42], stone, { ang: 0.3, len: 10, w: 2, lf: px => (px - x) * 0.8 });
+    P.clump(c, r, x, y - 92, 16, [150, 24, 12], { a: 0.85, n: 12, hl: [185, 30, 36] });
+  }
+  function roses(c, r, x, y) {
+    P.clump(c, r, x, y - 18, 30, [150, 26, 10], { a: 0.85, n: 26, shade: 4, hl: [180, 30, 32], hla: 0.3 });
+    for (let i = 0; i < 9; i++) {
+      c.globalAlpha = 0.9; c.fillStyle = P.hsl(350 + r() * 10, 55, 24 + r() * 12);
+      P.dab(c, x + (r() - 0.5) * 50, y - 18 + (r() - 0.5) * 26, 3.5, 3, r() * 3);
+    }
+    c.globalAlpha = 1;
+  }
+  {
+    const r = P.rng(2468);
+    for (let x = 120; x < L.near.width; x += 170 + r() * 260) {
+      const kind = Math.floor(r() * 5);
+      add(L.near, x - 70, x + 80, (c, rr) => {
+        const y = hillN(x) + 6;
+        if (kind === 0) brokenColumn(c, rr, x, y);
+        else if (kind === 1) urn(c, rr, x, y);
+        else if (kind === 2) roses(c, rr, x, y);
+        else if (kind === 3) headstone(c, rr, x, y, 26 + rr() * 10, 40 + rr() * 20, rr() < 0.3 ? 'cross' : 'round', (rr() - 0.5) * 0.25);
+        else for (let i = 0; i < 3; i++) P.clump(c, rr, x - 40 + i * 40, y - 22, 30, [158, 24, 11], { a: 0.85, n: 22, shade: 4, hl: [190, 30, 34], hla: 0.35 });
+      });
+    }
+  }
+
   // ---------------------------------------------------------------- playfield
   const groundY = x => 604 + (P.fbm(x * 0.01, 71) - 0.5) * 8;
   const PATH_T = 616, PATH_B = 652;
@@ -194,14 +247,14 @@ const World = (() => {
       const w = 34 + r() * 22;
       P.paintFill(c, r, cc => {
         cc.beginPath();
-        cc.moveTo(x - w * 0.9, H + 10); cc.quadraticCurveTo(x - w * 0.4, H * 0.5, x - w * 0.5, -10);
-        cc.lineTo(x + w * 0.5, -10); cc.quadraticCurveTo(x + w * 0.3, H * 0.5, x + w, H + 10); cc.closePath();
-      }, [x - w, 0, w * 2, H + 10], [228, 22, 6], { ang: 1.55, len: 40, w: 8, lf: px => Math.max(0, px - x) * 0.25 });
+        cc.moveTo(x - w * 0.9, H + 10); cc.quadraticCurveTo(x - w * 0.4, H * 0.5, x - w * 0.5, -240);
+        cc.lineTo(x + w * 0.5, -240); cc.quadraticCurveTo(x + w * 0.3, H * 0.5, x + w, H + 10); cc.closePath();
+      }, [x - w, -240, w * 2, H + 250], [228, 22, 6], { ang: 1.55, len: 40, w: 8, lf: px => Math.max(0, px - x) * 0.25 });
     });
   }
   for (let x = 400; x < L.fore.width; x += 1500 + ((x * 13) % 700)) {
-    add(L.fore, x - 300, x + 360, (c, r) => {
-      const pts = [[x - 280, -20], [x - 100, 30], [x + 100, 50], [x + 330, 20]];
+    add(L.fore, x - 360, x + 360, (c, r) => {
+      const pts = [[x - 340, -240], [x - 280, -20], [x - 100, 30], [x + 100, 50], [x + 330, 20]];
       P.brush(c, r, pts, 18, [228, 22, 6], 1, { taper: 0.7, k: 4 });
       for (let i = 0; i < 14; i++) {
         const t = r(), px = x - 250 + t * 560, py = 20 + Math.sin(t * 3) * 30;
@@ -377,8 +430,50 @@ const World = (() => {
   });
   SPOTS.push({ id: 'goblet', x: 968, y: 600 });
 
+
+  // the Vane mausoleum, where something rattles ----------------------------
+  add(L.ground, 2110, 2380, (c, r) => {
+    const cx = 2240, y = groundY(cx) + 6, stone = [220, 10, 28];
+    const lf = (px, py) => (px - cx) * 0.06 - (py - y) * -0.01;
+    for (let s = 0; s < 2; s++) {
+      P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 110 + s * 8, y - 12 - s * 10, 220 - s * 16, 12); }, [cx - 110, y - 22, 220, 22], [218, 10, 30 - s * 2], { ang: 0, len: 16, w: 2 });
+    }
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 92, y - 190, 184, 170); }, [cx - 92, y - 190, 184, 170], stone, { ang: 0.04, len: 20, w: 4, density: 90, lf });
+    c.strokeStyle = P.hsl(228, 14, 10, 0.45); c.lineWidth = 1.2;
+    for (let row = 0; row < 8; row++) {
+      const ry = y - 190 + row * 21;
+      c.beginPath(); c.moveTo(cx - 92, ry); c.lineTo(cx + 92, ry); c.stroke();
+    }
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.moveTo(cx - 108, y - 190); cc.lineTo(cx, y - 252); cc.lineTo(cx + 108, y - 190); cc.closePath(); },
+      [cx - 108, y - 254, 216, 66], [222, 12, 24], { ang: -0.25, len: 16, w: 3, lf });
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 112, y - 196, 224, 9); }, [cx - 112, y - 196, 224, 9], [218, 10, 36], { ang: 0, len: 16, w: 2 });
+    for (const px of [cx - 78, cx - 48, cx + 48, cx + 78]) {
+      P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(px - 8, y - 187, 16, 165); }, [px - 8, y - 187, 16, 165], [216, 10, 38],
+        { ang: 1.57, len: 18, w: 2, angJ: 0.05, lf: qx => (qx - px) * 1.8 });
+    }
+    // the open door, with a cold blue light inside
+    const g = c.createLinearGradient(0, y - 150, 0, y - 22);
+    g.addColorStop(0, 'rgba(10,14,30,1)'); g.addColorStop(1, 'rgba(40,90,150,1)');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(cx - 30, y - 22); c.lineTo(cx - 30, y - 120); c.arc(cx, y - 120, 30, Math.PI, 0); c.lineTo(cx + 30, y - 22); c.fill();
+    c.fillStyle = P.hsl(220, 14, 14); c.font = 'bold 13px Georgia'; c.textAlign = 'center';
+    c.fillText('V A N E', cx, y - 205);
+    for (let i = 0; i < 12; i++) P.clump(c, r, cx - 100 + r() * 200, y - 200 + r() * 180 * (r() < 0.5 ? 0.2 : 1), 10 + r() * 12, [150, 24, 12], { a: 0.8, n: 10, hl: [185, 30, 36], hla: 0.3 });
+  });
+  LIGHTS.push({ x: 2240, y: groundY(2240) - 70, r: 170, col: [120, 180, 255], flick: 0.4, cool: true });
+  SPOTS.push({ id: 'bones', x: 2290, y: 470 });
+
+  // surfaces the ghost can land on: [x0, x1, y]
+  const PLATFORMS = [
+    { x0: 436, x1: 486, y: 542 },     // the tall headstone
+    { x0: 3078, x1: 3322, y: 572 },   // fountain basin rim
+    { x0: 3142, x1: 3258, y: 472 },   // fountain upper bowl
+    { x0: 3830, x1: 3998, y: 574 },   // cellar wall
+  ];
+
   // gas lamps -----------------------------------------------------------
-  for (const lx of [1300, 2100, 2860, 3560, 4150]) {
+  const LAMPS = [1300, 1990, 2860, 3560, 4150];
+  for (const lx of LAMPS) {
     add(L.ground, lx - 20, lx + 20, (c, r) => lampPost(c, r, lx, groundY(lx) + 6));
     LIGHTS.push({ x: lx, y: groundY(lx) - 158, r: 230, col: [255, 170, 90], flick: 1 });
   }
@@ -596,12 +691,12 @@ const World = (() => {
   }
 
   // Draw a layer at a camera offset; S is device pixels per logical pixel.
-  function drawLayer(ctx, layer, cam, S, viewW, RS) {
-    const lx = cam * layer.f;
+  function drawLayer(ctx, layer, cam, S, viewW, RS, camY = 0) {
+    const lx = cam * layer.f, dy = Math.round(camY * layer.f * S);
     const i0 = Math.floor(lx / CH), i1 = Math.floor((lx + viewW) / CH);
     for (let i = i0; i <= i1; i++) {
       const cv = chunk(layer, i, RS);
-      ctx.drawImage(cv, Math.floor((i * CH - lx) * S), 0, Math.ceil(CH * S) + 1, Math.ceil(H * S));
+      ctx.drawImage(cv, Math.floor((i * CH - lx) * S), dy, Math.ceil(CH * S) + 1, Math.ceil(H * S));
     }
     for (const k of layer.cache.keys()) if (k < i0 - 3 || k > i1 + 3) layer.cache.delete(k);
   }
@@ -618,5 +713,5 @@ const World = (() => {
 
   function reset() { for (const l of layers) l.cache.clear(); }
 
-  return { H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR };
+  return { H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR };
 })();

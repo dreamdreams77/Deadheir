@@ -43,6 +43,10 @@
   #hud { justify-content: space-between; align-items: flex-start; padding: 16px 18px; opacity: 0; transition: opacity 1.2s ease 0.6s; }
   #hud.show { opacity: 1; }
   #clues { font-family: var(--fell); font-size: 20px; color: var(--gold); text-shadow: 0 2px 8px #000; }
+  #lantern { display: flex; gap: 8px; margin-top: 8px; }
+  #lantern i { width: 11px; height: 16px; border-radius: 50% 50% 45% 45%; background: rgba(240,201,135,0.15); border: 1px solid rgba(240,201,135,0.35); }
+  #lantern i.on { background: radial-gradient(circle at 50% 65%, #fff1c2, #f0a84a 60%, #b8612a); box-shadow: 0 0 10px rgba(255,170,80,0.8); border-color: transparent; }
+  #cells { margin-top: 8px; font-family: var(--fell); font-size: 17px; color: #8fd4ff; text-shadow: 0 0 10px rgba(120,190,255,0.6), 0 2px 6px #000; }
   #hud .right { display: flex; gap: 10px; pointer-events: auto; }
   #hud .btn { font-size: 16px; padding: 6px 16px; }
 
@@ -77,6 +81,8 @@
   #journal li { margin: 0 0 12px; font-size: 19px; line-height: 1.35; }
   #journal li b { display: block; font-family: var(--fell); font-weight: 400; font-size: 21px; }
   #journal li.unknown { opacity: 0.45; font-style: italic; }
+  #journal h3 { font-family: var(--fell); font-weight: 400; font-size: 22px; margin: 18px 0 4px; }
+  #journal #side { font-size: 18px; margin: 0; line-height: 1.35; }
   #journal .btn { color: #2a2116; border-color: rgba(42,33,22,0.4); background: transparent; font-size: 17px; margin-top: 8px; }
 
   /* ending */
@@ -91,6 +97,7 @@
   #touch { position: fixed; inset: auto 0 0 0; display: none; justify-content: space-between; padding: 0 16px 22px; pointer-events: none; }
   body.touch #touch { display: flex; }
   #touch .grp { display: flex; gap: 14px; pointer-events: auto; }
+  #touch button[hidden] { display: none; }
   #touch button { width: 68px; height: 68px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(14,14,24,0.5); color: var(--gold);
     font-size: 26px; touch-action: none; }
   body.touch #dialog { bottom: 120px; }
@@ -101,7 +108,7 @@
   <div id="stage"><canvas id="game" aria-label="Deadheir game scene"></canvas></div>
 
   <div id="hud" class="overlay">
-    <div id="clues">Clues 0 / 5</div>
+    <div class="left"><div id="clues">Clues 0 / 5</div><div id="lantern" aria-label="Lantern"></div><div id="cells" hidden></div></div>
     <div class="right">
       <button class="btn" id="journal-btn">Journal</button>
       <button class="btn" id="mute">Sound: on</button>
@@ -114,7 +121,7 @@
     <p>You were the heir of Vanehold until someone poisoned your wine. Now you walk the estate at night, and the house is keeping a secret.</p>
     <button class="btn" id="begin" disabled>Rise</button>
     <div id="loading">Painting the estate…</div>
-    <div class="keys">← → or A D to drift · E or Space to examine · J journal · M sound</div>
+    <div class="keys">← → / A D drift · Space / W jump, hold to glide · E examine · F fire · J journal · M sound</div>
   </div>
 
   <div id="dialog" role="dialog" aria-live="polite">
@@ -128,6 +135,8 @@
     <div class="page">
       <h2>What the dead remember</h2>
       <ol id="journal-list"></ol>
+      <h3>Side quest: Blue Bones</h3>
+      <p id="side"></p>
       <button class="btn" id="journal-close">Close</button>
     </div>
   </div>
@@ -140,7 +149,7 @@
 
   <div id="touch">
     <div class="grp"><button id="t-left" aria-label="Move left">◀</button><button id="t-right" aria-label="Move right">▶</button></div>
-    <div class="grp"><button id="t-act" aria-label="Examine">✦</button></div>
+    <div class="grp"><button id="t-fire" aria-label="Fire buster" hidden>●</button><button id="t-act" aria-label="Examine">✦</button><button id="t-jump" aria-label="Jump">⤒</button></div>
   </div>
 
   <script src="src/paint.js"></script>
