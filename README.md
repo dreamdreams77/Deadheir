@@ -1,17 +1,24 @@
 # Deadheir
 
-A short gothic mystery told in painted 2.5D. You are the ghost of Aldric Vane, heir of Vanehold, poisoned at the harvest feast. Drift across the moonlit estate, find five clues, and name your killer at the manor door.
+A short gothic mystery told in painted 2.5D. You are the ghost of Aldric Vane, heir of Vanehold, poisoned at the harvest feast. Drift across the moonlit estate, find five clues, and name your killer at the manor door. Then decide what to do with the truth.
 
 **Play:** open `index.html` in a browser. No build step, no dependencies.
+
+**On a phone:** turn it sideways. If your phone's rotation is locked, tap **Play sideways** on the title screen, or **Sideways** in the top bar during play. The game rotates itself to fill the screen; tap **Upright** to switch back.
 
 | Action | Keys | Touch |
 | --- | --- | --- |
 | Drift | ← → / A D | ◀ ▶ |
 | Jump (hold to glide) | Space / W / ↑ | ⤒ |
 | Examine / continue | E, Enter | ✦ |
+| Choose an answer | 1–3, or ↑ ↓ then Enter (Esc backs out) | tap |
 | Fire Bone Buster (hold to charge) | F / X | ● |
 | Journal | J | Journal button |
 | Sound | M | Sound button |
+
+## Echoes and endings
+
+Four optional **echoes** linger on the grounds: pale blue memories you can listen to. They show what drove each suspect, and what you yourself set in motion. Once you name the killer, you choose between justice and mercy, and the ending changes with your choice and with what you heard.
 
 ## Hazards and the side quest
 

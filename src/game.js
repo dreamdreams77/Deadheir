@@ -8,6 +8,8 @@
   const mod = (a, n) => ((a % n) + n) % n;
 
   let viewW = 1280, S = 1, RS = 0;
+  let sidewaysPref = false;
+  try { sidewaysPref = localStorage.getItem('deadheir.sideways') === '1'; } catch (e) { /* storage blocked */ }
   let sky, clouds, fogTex, vignette, grain, lightCv, lightCtx;
   const glow = {};
 
@@ -124,8 +126,40 @@
     return ctx.createPattern(c0, 'repeat');
   }
 
+  // When the phone is held upright and the player chose to play sideways,
+  // the whole app is rotated 90° with CSS and laid out in swapped dimensions.
+  function applySideways() {
+    const on = sidewaysPref && innerHeight > innerWidth;
+    const app = $('app');
+    document.body.classList.toggle('sideways', on);
+    app.style.width = on ? innerHeight + 'px' : '';
+    app.style.height = on ? innerWidth + 'px' : '';
+    app.style.transform = on ? `translateX(${innerWidth}px) rotate(90deg)` : '';
+    document.body.classList.toggle('portrait', !on && innerHeight > innerWidth);
+    $('rotate').textContent = sidewaysPref ? 'Upright' : 'Sideways';
+    return on;
+  }
+
+  async function setSideways(on) {
+    sidewaysPref = on;
+    try { localStorage.setItem('deadheir.sideways', on ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    if (on && innerHeight > innerWidth) {
+      // Prefer a real landscape lock (Android); fall back to rotating the page (iOS)
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+        await screen.orientation.lock('landscape');
+      } catch (e) { /* not supported: CSS rotation takes over */ }
+    } else if (!on) {
+      try { screen.orientation.unlock(); } catch (e) { /* not supported */ }
+      try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) { /* not in fullscreen */ }
+    }
+    resize();
+  }
+
   function resize() {
-    const w = innerWidth, h = innerHeight;
+    const side = applySideways();
+    const w = side ? innerHeight : innerWidth, h = side ? innerWidth : innerHeight;
+    document.body.classList.toggle('compact', h < 540);
     viewW = Math.round(clamp((720 * w) / h, 960, World.MAXVIEW));
     let cssW, cssH;
     if (w / h > viewW / H) { cssH = h; cssW = (h * viewW) / H; } else { cssW = w; cssH = (w * H) / viewW; }
@@ -145,7 +179,7 @@
   // ---------------------------------------------------------------- state
   const state = {
     mode: 'title', t: 0, cam: 0, camY: 0, camDir: 1,
-    found: new Set(), seen: new Set(),
+    found: new Set(), seen: new Set(), echoes: new Set(),
     keys: {}, touch: { l: false, r: false, jump: false },
     lantern: 3, checkpoint: 200, inv: 0, lock: 0, fade: 0, respawning: false,
     quest: { met: false, cells: new Set(), done: false },
@@ -153,6 +187,7 @@
   };
   const player = { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1, sw: 0, swv: 0, lantern: [0, 0] };
   const CLUES = Object.keys(STORY).filter(k => STORY[k].clue);
+  const ECHOES = Object.keys(STORY).filter(k => STORY[k].echo);
   const BONES_X = 2290;
 
   // Blue Bones' Energy Cells: one needs the headstone, one the fountain bowls, one is guarded by shades
@@ -188,6 +223,11 @@
     return { u: r(), v: r(), ph: r() * 6, sp: 0.3 + r() * 0.7 };
   });
   const wisps = [];
+  const bats = Array.from({ length: 8 }, (_, i) => {
+    const r = P.rng(1700 + i);
+    return { z: [0.3, 0.45, 0.62][i % 3], x: r() * 3000, y: 120 + r() * 200, sp: 30 + r() * 50, ph: r() * 6, amp: 20 + r() * 40 };
+  });
+  const FOUNTAIN_X = 3200;
 
   // ---------------------------------------------------------------- audio
   const Audio = {
@@ -282,11 +322,12 @@
       $('dlg-text').textContent = dlg.full;
       if (dlg.choices && !dlg.queue.length) {
         if (!$('dlg-choices').children.length) {
-          for (const ch of dlg.choices) {
-            const b = document.createElement('button'); b.textContent = ch.label;
+          for (const [i, ch] of dlg.choices.entries()) {
+            const b = document.createElement('button'); b.textContent = `${i + 1}. ${ch.label}`;
             b.onclick = e => { e.stopPropagation(); $('dialog').classList.remove('show'); state.mode = 'play'; ch.fn(); };
             $('dlg-choices').appendChild(b);
           }
+          $('dlg-choices').firstChild.focus({ preventScroll: true });
         }
       } else $('dlg-more').style.visibility = 'visible';
     }
@@ -306,6 +347,14 @@
       if (state.found.has(id)) { li.innerHTML = `<b>${STORY[id].title}</b><span>${STORY[id].note}</span>`; }
       else { li.className = 'unknown'; li.innerHTML = '<b>Not yet found</b><span>Something still waits on the grounds.</span>'; }
       list.appendChild(li);
+    }
+    const echoes = $('echo-list');
+    echoes.innerHTML = '';
+    for (const id of ECHOES) {
+      const li = document.createElement('li');
+      if (state.echoes.has(id)) li.innerHTML = `<b>${STORY[id].title}</b><span>${STORY[id].note}</span>`;
+      else { li.className = 'unknown'; li.innerHTML = '<b>Unheard</b><span>A pale voice is waiting somewhere.</span>'; }
+      echoes.appendChild(li);
     }
     $('side').textContent = q.done
       ? 'Blue Bones is back at full power. You carry his Bone Buster: F to fire, hold F to charge.'
@@ -330,7 +379,12 @@
 
   function talkBones() {
     const q = state.quest;
-    if (!q.met) {
+    if (!q.met && q.cells.size === 3) {
+      q.met = true; q.done = true; state.buster = true;
+      Audio.chime(880);
+      openDialog(BONES.name, [...BONES.meet.slice(0, 3), BONES.already, ...BONES.done],
+        () => { updateHud(); toast('Bone Buster: F to fire, hold to charge'); });
+    } else if (!q.met) {
       q.met = true;
       openDialog(BONES.name, BONES.meet, () => { updateHud(); toast('Side quest: the Energy Cells'); });
     } else if (q.done) {
@@ -352,12 +406,16 @@
       if (state.found.size < CLUES.length) {
         openDialog(s.title, [`${s.locked} (${state.found.size} of ${CLUES.length} clues found)`]);
       } else {
-        openDialog(s.title, [s.ask], null, SUSPECTS.map(su => ({ label: su.name, fn: () => accuse(su.id) })));
+        openDialog(s.title, [s.ask], null, [
+          ...SUSPECTS.map(su => ({ label: su.name, fn: () => accuse(su.id) })),
+          { label: 'Not yet. I need to think.', fn: () => {} },
+        ]);
       }
       return;
     }
     const first = !state.seen.has(spot.id);
     state.seen.add(spot.id);
+    if (s.echo && first) { state.echoes.add(spot.id); Audio.chime(392); updateHud(); toast(`Echo heard: ${s.title}`); }
     if (s.clue && first) { state.found.add(spot.id); Audio.chime(spot.id === 'keys' ? 520 : 660); updateHud(); toast(`Clue found: ${s.title}`); }
     openDialog(s.title, s.text);
   }
@@ -372,14 +430,23 @@
   }
 
   function accuse(id) {
-    if (id === CULPRIT) {
-      state.mode = 'end';
-      Audio.chime(440);
-      const pages = ENDINGS.right.slice();
-      if (state.quest.done) pages.push(BONES.ending);
-      $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
-      $('ending').classList.add('show');
-    } else openDialog('Silence', [ENDINGS.wrong]);
+    if (id !== CULPRIT) return openDialog('Silence', [ENDINGS.wrong]);
+    const knows = state.echoes.has('echo_steward') || state.echoes.has('echo_heir');
+    openDialog('Halloway', ENDINGS.confront(knows), null, [
+      { label: 'Let the law take him.', fn: () => ending('justice') },
+      { label: 'Show him mercy.', fn: () => ending('mercy') },
+    ]);
+  }
+
+  function ending(kind) {
+    state.mode = 'end';
+    Audio.chime(kind === 'mercy' ? 520 : 440);
+    const e = ENDINGS[kind], pages = e.text.slice();
+    if (state.echoes.size === ECHOES.length) pages.push(ENDINGS.understood);
+    if (state.quest.done) pages.push(BONES.ending);
+    $('ending-title').textContent = e.title;
+    $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
+    $('ending').classList.add('show');
   }
 
   function nearestSpot() {
@@ -432,12 +499,18 @@
     Audio.start();
     $('title').classList.add('hide');
     $('hud').classList.add('show');
+    document.body.classList.add('playing');
     state.mode = 'play';
-    setTimeout(() => { if (!state.seen.has('grave')) { state.seen.add('grave'); openDialog(STORY.grave.title, STORY.grave.text); } }, 1400);
+    const intro = () => {
+      if (state.seen.has('grave')) return;
+      if (state.mode !== 'play') { setTimeout(intro, 500); return; } // wait until the journal is closed
+      state.seen.add('grave'); openDialog(STORY.grave.title, STORY.grave.text);
+    };
+    setTimeout(intro, 1400);
   }
 
   function restart() {
-    state.found.clear(); state.seen.clear();
+    state.found.clear(); state.seen.clear(); state.echoes.clear();
     state.quest = { met: false, cells: new Set(), done: false };
     state.buster = false; state.lantern = 3; state.checkpoint = 200; state.inv = 0; state.fade = 0; state.respawning = false;
     Object.assign(player, { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1 });
@@ -455,7 +528,20 @@
     if (state.mode === 'title') { if (k === 'enter' || k === ' ') begin(); return; }
     state.keys[k] = true;
     if (e.repeat) return;
-    if (state.mode === 'dialog') { if (k === 'e' || k === ' ' || k === 'enter') advance(); return; }
+    if (state.mode === 'dialog') {
+      const btns = [...$('dlg-choices').children];
+      if (btns.length) {
+        const i = btns.indexOf(document.activeElement);
+        if (k === 'arrowdown' || k === 's') btns[(i + 1) % btns.length].focus();
+        else if (k === 'arrowup' || k === 'w') btns[(i - 1 + btns.length) % btns.length].focus();
+        else if (/^[1-9]$/.test(k) && btns[+k - 1]) btns[+k - 1].click();
+        else if (k === 'enter' || k === ' ' || k === 'e') (btns[i] || btns[0]).click();
+        else if (k === 'escape') btns[btns.length - 1].click(); // the last choice always backs out
+        return;
+      }
+      if (k === 'e' || k === ' ' || k === 'enter') advance();
+      return;
+    }
     if (k === 'e' || k === 'enter') interact();
     else if (k === ' ' || k === 'w' || k === 'arrowup') jump();
     else if (k === 'f' || k === 'x') startCharge();
@@ -469,7 +555,10 @@
     if (k === 'f' || k === 'x') releaseCharge();
   });
   addEventListener('blur', () => { state.keys = {}; state.charging = false; });
+  document.addEventListener('click', e => { if (e.target.closest('#hud, #title')) e.target.blur(); });
   $('begin').onclick = begin;
+  $('rotate').onclick = () => setSideways(!sidewaysPref);
+  $('rotate-title').onclick = () => setSideways(true);
   $('dialog').onclick = advance;
   $('journal-btn').onclick = () => toggleJournal();
   $('journal-close').onclick = () => toggleJournal(false);
@@ -951,6 +1040,54 @@
     }
   }
 
+  // Bats wheel through the middle distance: smaller, slower and hazier the farther they are.
+  function drawBats(z0, z1) {
+    const span = viewW + 400;
+    for (const b of bats) {
+      if (b.z < z0 || b.z > z1) continue;
+      const t = state.t, sz = 5 + b.z * 12;
+      const sx = mod(b.x + t * b.sp - state.cam * b.z, span) - 200;
+      const sy = b.y + Math.sin(t * 1.3 + b.ph) * b.amp + state.camY * b.z;
+      const flap = Math.sin(t * 13 + b.ph * 3);
+      ctx.save();
+      ctx.setTransform(S, 0, 0, S, sx * S, sy * S);
+      const haze = 1 - b.z;
+      ctx.fillStyle = `rgb(${12 + haze * 60},${12 + haze * 66},${26 + haze * 90})`;
+      ctx.beginPath(); ctx.ellipse(0, 0, sz * 0.25, sz * 0.4, 0, 0, P.TAU); ctx.fill();
+      for (const d of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(0, -sz * 0.1);
+        ctx.quadraticCurveTo(d * sz * 0.8, -sz * (0.2 + flap * 0.7), d * sz * 1.6, -sz * flap * 0.5);
+        ctx.lineTo(d * sz * 1.2, sz * 0.05); ctx.lineTo(d * sz * 0.9, -sz * 0.05); ctx.lineTo(d * sz * 0.55, sz * 0.15);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Animated droplets and ripples over the painted fountain.
+  function drawFountain() {
+    const cx = toScreen(FOUNTAIN_X, 1);
+    if (cx < -200 || cx > viewW + 200) return;
+    const base = World.groundY(FOUNTAIN_X) + 8 + state.camY, t = state.t;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 28; i++) {
+      const side = i % 2 ? 1 : -1, ph = mod(t * 0.7 + i / 28, 1);
+      const x = cx + side * (50 + ph * 34 + (i % 5)), y = base - 138 + ph * ph * 96;
+      ctx.globalAlpha = 0.5 * (1 - ph * 0.6);
+      ctx.drawImage(glow.cool, (x - 3) * S, (y - 3) * S, 6 * S, 6 * S);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(170,215,255,1)'; ctx.lineWidth = 1 * S;
+    for (let i = 0; i < 4; i++) {
+      const ph = mod(t * 0.5 + i / 4, 1), side = i % 2 ? 1 : -1;
+      ctx.globalAlpha = 0.35 * (1 - ph);
+      ctx.beginPath();
+      ctx.ellipse((cx + side * 88) * S, (base - 42) * S, (6 + ph * 26) * S, (1.5 + ph * 4) * S, 0, 0, P.TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawWisps() {
     ctx.globalCompositeOperation = 'lighter';
     for (const w of wisps) {
@@ -972,30 +1109,37 @@
       const a = done ? 0.15 : 0.55 * pulse * (s === near ? 1.5 : 1);
       const sz = 90;
       ctx.globalAlpha = a;
-      ctx.drawImage(glow.gold, (sx - sz / 2) * S, (s.y + cy + 50 - sz / 2) * S, sz * S, sz * S);
+      const img = STORY[s.id]?.echo ? glow.cool : glow.gold;
+      ctx.drawImage(img, (sx - sz / 2) * S, (s.y + cy + 50 - sz / 2) * S, sz * S, sz * S);
       if (!done) {
         for (let i = 0; i < 5; i++) {
           const ph = mod(state.t * 0.4 + i / 5, 1);
           const mx = sx + Math.sin(i * 2.3 + state.t) * 16, my = s.y + cy + 70 - ph * 90;
           ctx.globalAlpha = (1 - ph) * 0.8;
-          ctx.drawImage(glow.gold, (mx - 6) * S, (my - 6) * S, 12 * S, 12 * S);
+          ctx.drawImage(img, (mx - 6) * S, (my - 6) * S, 12 * S, 12 * S);
         }
       }
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-    if (near && state.mode === 'play' && !state.respawning) {
-      const sx = toScreen(near.x, 1), sy = near.y + cy - 10 + Math.sin(state.t * 3) * 3;
-      const label = near.id === 'door' ? 'Enter' : near.id === 'bones' ? 'Talk' : state.seen.has(near.id) ? 'Recall' : 'Examine';
-      const key = document.body.classList.contains('touch') ? '✦' : 'E';
-      ctx.save();
-      ctx.setTransform(S, 0, 0, S, 0, 0);
-      ctx.font = 'italic 20px "IM Fell English", Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
-      ctx.fillStyle = 'rgba(255,228,170,0.95)';
-      ctx.fillText(`${key} · ${label}`, sx, sy);
-      ctx.restore();
-    }
+  }
+
+  // The interaction prompt floats above the spot, or above the ghost's head when they overlap.
+  function drawPrompt(near) {
+    if (!near || state.mode !== 'play' || state.respawning) return;
+    const cy = state.camY;
+    const sx = toScreen(near.x, 1);
+    const sy = Math.min(near.y, player.y - 165) + cy - 10 + Math.sin(state.t * 3) * 3;
+    const label = near.id === 'door' ? 'Enter' : near.id === 'bones' ? 'Talk'
+      : STORY[near.id]?.echo ? 'Listen' : state.seen.has(near.id) ? 'Recall' : 'Examine';
+    const key = document.body.classList.contains('touch') ? '✦' : 'E';
+    ctx.save();
+    ctx.setTransform(S, 0, 0, S, 0, 0);
+    ctx.font = 'italic 20px "IM Fell English", Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(255,228,170,0.95)';
+    ctx.fillText(`${key} · ${label}`, sx, sy);
+    ctx.restore();
   }
 
   function drawLeaves() {
@@ -1052,6 +1196,11 @@
       const sx = toScreen(l.x, 1);
       if (sx < -l.r || sx > viewW + l.r) continue;
       bloom(l.cool ? glow.cool : glow.warm, sx, l.y + cy, l.r * 0.6 * flick(l), l.cool ? 0.22 : 0.32);
+      if (l.pool) {
+        const gy = World.groundY(l.x) + 22 + cy, r = l.r * 0.95 * flick(l);
+        ctx.globalAlpha = 0.3;
+        ctx.drawImage(glow.warm, (sx - r) * S, (gy - r * 0.16) * S, r * 2 * S, r * 0.32 * S);
+      }
     }
     if (state.mode !== 'title') {
       const [lx, ly] = player.lantern;
@@ -1087,14 +1236,17 @@
     drawFog(400, 170, 0.75, 0.3, 6);
     drawFlies(0.4);
     layer(L.back);
+    drawBats(0, 0.5);
     drawFog(450, 160, 0.7, 0.5, 9);
     drawRays();
     layer(L.mid);
+    drawBats(0.5, 1);
     drawFlies(0.66);
     drawFog(500, 140, 0.55, 0.8, 12);
     layer(L.near);
     drawFog(535, 120, 0.35, 0.92, 14);
     layer(L.ground);
+    drawFountain();
     const near = state.mode === 'title' ? null : nearestSpot();
     drawSpots(near);
     drawCells();
@@ -1102,6 +1254,7 @@
     drawShades();
     if (state.mode !== 'title') { drawWisps(); drawGhost(); }
     drawShots();
+    drawPrompt(near);
     drawFlies(1);
     drawFog(560, 150, 0.45, 1.1, 16);
     layer(L.fore);
