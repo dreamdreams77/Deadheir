@@ -220,6 +220,27 @@ const World = (() => {
     c.globalAlpha = 1;
   };
 
+  // rain puddles on the path; their reflections are animated in the game loop
+  const PUDDLES = [[760, 58], [1500, 44], [2060, 64], [2960, 50], [3640, 60], [4420, 72]].map(([x, rx]) => ({ x, rx, ry: rx * 0.13, y: PATH_T + 22 }));
+  function puddle(c, r, p) {
+    const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.rx);
+    g.addColorStop(0, 'rgba(14,18,40,0.95)'); g.addColorStop(0.75, 'rgba(22,26,52,0.9)'); g.addColorStop(1, 'rgba(30,30,48,0.5)');
+    c.save(); c.translate(p.x, p.y); c.scale(1, p.ry / p.rx); c.translate(-p.x, -p.y);
+    c.globalAlpha = 1; c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, p.rx, 0, P.TAU); c.fill();
+    c.restore();
+    // wet mud rim and a cold sky sheen
+    c.strokeStyle = P.hsl(25, 20, 9, 0.8); c.lineWidth = 2.5;
+    c.beginPath(); c.ellipse(p.x, p.y + 1, p.rx + 2, p.ry + 1.5, 0, 0.1, Math.PI - 0.1); c.stroke();
+    c.strokeStyle = P.hsl(220, 30, 45, 0.35); c.lineWidth = 1.2;
+    c.beginPath(); c.ellipse(p.x, p.y, p.rx * 0.9, p.ry * 0.8, 0, Math.PI + 0.3, P.TAU - 0.3); c.stroke();
+    for (let i = 0; i < 6; i++) { c.fillStyle = P.hsl(30, 15, 12, 0.7); P.dab(c, p.x + (r() - 0.5) * p.rx * 2.1, p.y + (r() - 0.5) * p.ry * 2.4, 3 + r() * 4, 1.5, 0); }
+  }
+  const groundFront = L.ground.front;
+  L.ground.front = (c, x0, x1) => {
+    groundFront(c, x0, x1);
+    for (const p of PUDDLES) if (p.x + p.rx > x0 - 20 && p.x - p.rx < x1 + 20) puddle(c, P.rng(P.hash(p.x, 404)), p);
+  };
+
   // ---------------------------------------------------------------- foreground
   L.fore.terrain = (c, x0, x1) => {
     cellsDo(5, 1, x0, x1, 64, (r, a, b) => {
@@ -315,6 +336,7 @@ const World = (() => {
   }
 
   function angel(c, r, x, y, s) {
+    P.shadow(c, x, y, 40 * s, 7 * s);
     const stone = [218, 10, 34];
     P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - 22 * s, y - 40 * s, 44 * s, 40 * s); },
       [x - 24 * s, y - 42 * s, 48 * s, 44 * s], stone, { ang: 1.5, len: 8, w: 2.5, lf: px => (px - x) * 0.4 });
@@ -334,6 +356,7 @@ const World = (() => {
   }
 
   function headstone(c, r, x, y, w, h, kind, tilt = 0) {
+    P.shadow(c, x, y, w * 0.9, w * 0.14);
     c.save();
     c.translate(x, y); c.rotate(tilt);
     const stone = [222, 9, 30 + r() * 8];
@@ -365,6 +388,7 @@ const World = (() => {
   }
 
   function lampPost(c, r, x, y) {
+    P.shadow(c, x, y + 2, 26, 5, 0.4);
     const iron = [228, 18, 8];
     P.brush(c, r, [[x, y], [x, y - 150]], 5, iron, 1, { k: 3, rim: RIM, rimA: 0.35 });
     P.brush(c, r, [[x - 8, y], [x + 8, y]], 6, iron, 1, { k: 2 });
@@ -434,6 +458,7 @@ const World = (() => {
   // the Vane mausoleum, where something rattles ----------------------------
   add(L.ground, 2110, 2380, (c, r) => {
     const cx = 2240, y = groundY(cx) + 6, stone = [220, 10, 28];
+    P.shadow(c, cx, y + 2, 150, 13, 0.55);
     const lf = (px, py) => (px - cx) * 0.06 - (py - y) * -0.01;
     for (let s = 0; s < 2; s++) {
       P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 110 + s * 8, y - 12 - s * 10, 220 - s * 16, 12); }, [cx - 110, y - 22, 220, 22], [218, 10, 30 - s * 2], { ang: 0, len: 16, w: 2 });
@@ -475,12 +500,13 @@ const World = (() => {
   const LAMPS = [1300, 1990, 2860, 3560, 4150];
   for (const lx of LAMPS) {
     add(L.ground, lx - 20, lx + 20, (c, r) => lampPost(c, r, lx, groundY(lx) + 6));
-    LIGHTS.push({ x: lx, y: groundY(lx) - 158, r: 230, col: [255, 170, 90], flick: 1, pool: true });
+    LIGHTS.push({ x: lx, y: groundY(lx) - 158, r: 230, col: [255, 170, 90], flick: 1, pool: true, cone: true });
   }
 
   // gardener's shed -----------------------------------------------------
   add(L.ground, 1600, 1830, (c, r) => {
     const x = 1640, y = groundY(1700) + 6, w = 150, h = 130;
+    P.shadow(c, x + w / 2, y + 2, w * 0.75, 12, 0.55);
     P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x, y - h, w, h); }, [x, y - h, w, h], [24, 22, 16],
       { ang: 1.57, len: 30, w: 4, angJ: 0.05, density: 60, lf: px => (px - x) / w * 10 });
     c.strokeStyle = P.hsl(20, 20, 7, 0.8); c.lineWidth = 1.5;
@@ -502,6 +528,7 @@ const World = (() => {
   // the gazebo ---------------------------------------------------------
   add(L.ground, 2360, 2660, (c, r) => {
     const cx = 2510, y = groundY(cx) + 6, stone = [216, 12, 40];
+    P.shadow(c, cx, y + 2, 170, 14, 0.5);
     P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 125, y - 18, 250, 18); }, [cx - 125, y - 18, 250, 18], stone, { ang: 0.02, len: 18, w: 3 });
     for (const px of [cx - 105, cx - 36, cx + 36, cx + 105]) {
       P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(px - 7, y - 150, 14, 132); }, [px - 7, y - 150, 14, 132], stone,
@@ -526,6 +553,7 @@ const World = (() => {
   // the fountain -------------------------------------------------------
   add(L.ground, 3060, 3340, (c, r) => {
     const cx = 3200, y = groundY(cx) + 8, stone = [214, 10, 36];
+    P.shadow(c, cx, y + 2, 160, 13, 0.5);
     const ell = (ex, ey, rx, ry, col, o) => P.paintFill(c, r, cc => { cc.beginPath(); cc.ellipse(ex, ey, rx, ry, 0, 0, P.TAU); }, [ex - rx, ey - ry, rx * 2, ry * 2], col, o);
     P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(cx - 125, y - 40, 250, 40); }, [cx - 125, y - 40, 250, 40], stone, { ang: 0.05, len: 20, w: 3, lf: px => (px - cx) * 0.06 });
     ell(cx, y - 40, 125, 14, [210, 30, 20], { ang: 0, len: 30, w: 2, lf: px => (px - cx) * 0.05 });
@@ -547,6 +575,7 @@ const World = (() => {
   // cellar hatch ---------------------------------------------------------
   add(L.ground, 3800, 4020, (c, r) => {
     const x = 3860, y = groundY(3900) + 10;
+    P.shadow(c, x + 55, y + 2, 120, 10, 0.45);
     P.paintFill(c, r, cc => { cc.beginPath(); cc.moveTo(x - 30, y); cc.lineTo(x - 30, y - 40); cc.lineTo(x + 140, y - 40); cc.lineTo(x + 140, y); cc.closePath(); },
       [x - 30, y - 42, 170, 44], [222, 10, 26], { ang: 0.05, len: 16, w: 4, lf: px => (px - x) * 0.04 });
     c.strokeStyle = P.hsl(225, 14, 12, 0.7); c.lineWidth = 1.5;
@@ -703,7 +732,8 @@ const World = (() => {
       const cv = chunk(layer, i, RS);
       ctx.drawImage(cv, Math.floor((i * CH - lx) * S), dy, Math.ceil(CH * S) + 1, Math.ceil(H * S));
     }
-    for (const k of layer.cache.keys()) if (k < i0 - 3 || k > i1 + 3) layer.cache.delete(k);
+    // keep just a chunk either side: prewarm paints one ahead, and phones are short on canvas memory
+    for (const k of layer.cache.keys()) if (k < i0 - 1 || k > i1 + 1) layer.cache.delete(k);
   }
 
   // Paint at most one upcoming chunk per call, ahead of the camera.
@@ -718,5 +748,5 @@ const World = (() => {
 
   function reset() { for (const l of layers) l.cache.clear(); }
 
-  return { H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR };
+  return { H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, PUDDLES, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR };
 })();

@@ -184,6 +184,7 @@
     lantern: 3, checkpoint: 200, inv: 0, lock: 0, fade: 0, respawning: false,
     quest: { met: false, cells: new Set(), done: false },
     buster: false, charging: false, charge: 0,
+    flash: 0, strikeT: 99, nextStrike: 22,
   };
   const player = { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1, sw: 0, swv: 0, lantern: [0, 0] };
   const CLUES = Object.keys(STORY).filter(k => STORY[k].clue);
@@ -278,6 +279,21 @@
     thud() { this.blip('triangle', 180, 50, 0.16, 0.14); },
     hit() { this.blip('sawtooth', 240, 40, 0.45, 0.07); },
     jump() { this.blip('sine', 300, 520, 0.18, 0.04); },
+    thunder() {
+      if (!this.ac) return;
+      const ac = this.ac, t = ac.currentTime, len = 3.5;
+      const buf = ac.createBuffer(1, ac.sampleRate * len, ac.sampleRate), d = buf.getChannelData(0);
+      let v = 0;
+      for (let i = 0; i < d.length; i++) { v = v * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = v * 9; }
+      const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 160;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      src.connect(lp); lp.connect(g); g.connect(this.master); src.start(t);
+    },
+    // iOS suspends audio after the screen locks; background tabs should go quiet
+    wake() { if (this.ac && this.ac.state === 'suspended' && !document.hidden) this.ac.resume(); },
+    sleep() { if (this.ac && this.ac.state === 'running') this.ac.suspend(); },
     toggle() {
       this.muted = !this.muted;
       if (this.master) this.master.gain.value = this.muted ? 0 : 0.8;
@@ -366,7 +382,7 @@
 
   function toggleJournal(force) {
     const open = force ?? !$('journal').classList.contains('show');
-    if (open && state.mode !== 'play') return;
+    if (state.mode !== (open ? 'play' : 'journal')) return; // only opens from play, only closes itself
     $('journal').classList.toggle('show', open);
     state.mode = open ? 'journal' : 'play';
   }
@@ -555,6 +571,8 @@
     if (k === 'f' || k === 'x') releaseCharge();
   });
   addEventListener('blur', () => { state.keys = {}; state.charging = false; });
+  addEventListener('pointerdown', () => Audio.wake());
+  document.addEventListener('visibilitychange', () => (document.hidden ? Audio.sleep() : Audio.wake()));
   document.addEventListener('click', e => { if (e.target.closest('#hud, #title')) e.target.blur(); });
   $('begin').onclick = begin;
   $('rotate').onclick = () => setSideways(!sidewaysPref);
@@ -647,6 +665,10 @@
         Object.assign(player, { x: state.checkpoint, y: World.groundY(state.checkpoint), vx: 0, vy: 0, ground: true });
         state.cam = clamp(player.x - viewW * 0.42, 0, World.WORLD_W + 300 - viewW);
         state.lantern = 3; state.respawning = false; state.inv = 1.5;
+        // shades near the lamp drift back to the far end of their patrol
+        for (const sh of shades) {
+          if (sh.alive && Math.abs(sh.x - player.x) < 300) sh.x = Math.abs(sh.a - player.x) > Math.abs(sh.b - player.x) ? sh.a : sh.b;
+        }
         updateHud();
       }
     } else state.fade = Math.max(0, state.fade - dt * 0.9);
@@ -678,8 +700,20 @@
     }
   }
 
+  // A distant storm: a double flash, then thunder a moment later.
+  function updateStorm(dt) {
+    state.nextStrike -= dt; state.strikeT += dt;
+    if (state.nextStrike <= 0) {
+      state.strikeT = 0; state.nextStrike = 24 + Math.random() * 32;
+      setTimeout(() => Audio.thunder(), 900 + Math.random() * 1600);
+    }
+    const t = state.strikeT;
+    state.flash = t < 0.07 ? 1 : t < 0.16 ? 0.15 : t < 0.24 ? 0.75 : Math.max(0, 0.75 * Math.exp(-(t - 0.24) * 6));
+  }
+
   function update(dt) {
     state.t += dt;
+    updateStorm(dt);
     if (state.mode === 'play') { updatePlayer(dt); updateShades(dt); }
 
     const camTarget = clamp(player.x - viewW * 0.42 + player.face * 70, 0, World.WORLD_W + 300 - viewW);
@@ -1064,6 +1098,49 @@
     }
   }
 
+  // Lightning brightens what has been drawn so far; called between layers, so the
+  // far hills flare and the near ground stays a dark silhouette.
+  function flashOver(a) {
+    if (state.flash < 0.01) return;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(150,170,255,${(a * state.flash).toFixed(3)})`;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Lamps, the ghost and the sky shimmer in the path's puddles.
+  function drawPuddles() {
+    const cy = state.camY, t = state.t;
+    for (const p of World.PUDDLES) {
+      const sx = toScreen(p.x, 1), sy = p.y + cy;
+      if (sx < -p.rx - 20 || sx > viewW + p.rx + 20) continue;
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(sx * S, sy * S, p.rx * 0.95 * S, p.ry * 0.9 * S, 0, 0, P.TAU); ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+      const streak = (img, x, a, w) => {
+        ctx.globalAlpha = a;
+        ctx.drawImage(img, (x - w / 2) * S, (sy - p.ry * 2.5) * S, w * S, p.ry * 5 * S);
+      };
+      for (const l of World.LIGHTS) {
+        if (!l.pool) continue;
+        const d = Math.abs(l.x - p.x);
+        if (d < 300) streak(glow.warm, toScreen(l.x, 1), 0.6 * (1 - d / 300) * (0.9 + Math.sin(t * 9 + l.x) * 0.1), 26);
+      }
+      const gd = Math.abs(player.x - p.x);
+      if (state.mode !== 'title' && gd < p.rx + 40) streak(glow.cool, toScreen(player.x, 1), 0.45 * (1 - gd / (p.rx + 40)), 34);
+      if (state.flash > 0.01) { ctx.globalAlpha = state.flash * 0.6; ctx.fillStyle = 'rgb(150,170,255)'; ctx.fillRect(0, 0, cv.width, cv.height); }
+      // ripples
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(180,200,255,1)'; ctx.lineWidth = S;
+      for (let i = 0; i < 2; i++) {
+        const ph = mod(t * 0.35 + i * 0.5 + p.x * 0.001, 1);
+        ctx.globalAlpha = 0.3 * (1 - ph);
+        ctx.beginPath(); ctx.ellipse((sx + (i ? 18 : -14)) * S, sy * S, (4 + ph * p.rx * 0.5) * S, (1 + ph * p.ry * 0.5) * S, 0, 0, P.TAU); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   // Animated droplets and ripples over the painted fountain.
   function drawFountain() {
     const cx = toScreen(FOUNTAIN_X, 1);
@@ -1196,6 +1273,15 @@
       const sx = toScreen(l.x, 1);
       if (sx < -l.r || sx > viewW + l.r) continue;
       bloom(l.cool ? glow.cool : glow.warm, sx, l.y + cy, l.r * 0.6 * flick(l), l.cool ? 0.22 : 0.32);
+      if (l.cone) {
+        const top = l.y + cy + 8, bot = World.groundY(l.x) + 20 + cy, w1 = l.r * 0.5;
+        const g = ctx.createLinearGradient(0, top * S, 0, bot * S);
+        g.addColorStop(0, 'rgba(255,190,110,0.2)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+        ctx.globalAlpha = flick(l); ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo((sx - 9) * S, top * S); ctx.lineTo((sx + 9) * S, top * S);
+        ctx.lineTo((sx + w1) * S, bot * S); ctx.lineTo((sx - w1) * S, bot * S); ctx.fill();
+      }
       if (l.pool) {
         const gy = World.groundY(l.x) + 22 + cy, r = l.r * 0.95 * flick(l);
         ctx.globalAlpha = 0.3;
@@ -1206,6 +1292,13 @@
       const [lx, ly] = player.lantern;
       bloom(glow.warm, toScreen(lx, 1), ly + cy, 150 * (player.flick || 1), 0.45);
       bloom(glow.cool, toScreen(player.x, 1), player.y + cy - 80, 120, 0.12);
+      // the lantern's light pooling on whatever lies below it
+      const below = surfaceBelow(player.x, player.y), h = below - ly;
+      if (h < 280) {
+        const r = 90 + h * 0.3;
+        ctx.globalAlpha = 0.4 * (1 - h / 280) * (player.flick || 1);
+        ctx.drawImage(glow.warm, (toScreen(lx, 1) - r) * S, (below + cy + 12 - r * 0.16) * S, r * 2 * S, r * 0.32 * S);
+      }
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
@@ -1215,6 +1308,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(sky.cv, 0, 0, W, Hh);
+    flashOver(0.5);
 
     // twinkling stars
     ctx.fillStyle = '#dfe8ff';
@@ -1233,19 +1327,23 @@
     layer(L.mount);
     drawFog(330, 170, 0.8, 0.12, 4);
     layer(L.far);
+    flashOver(0.22);
     drawFog(400, 170, 0.75, 0.3, 6);
     drawFlies(0.4);
     layer(L.back);
+    flashOver(0.12);
     drawBats(0, 0.5);
     drawFog(450, 160, 0.7, 0.5, 9);
     drawRays();
     layer(L.mid);
+    flashOver(0.06);
     drawBats(0.5, 1);
     drawFlies(0.66);
     drawFog(500, 140, 0.55, 0.8, 12);
     layer(L.near);
     drawFog(535, 120, 0.35, 0.92, 14);
     layer(L.ground);
+    drawPuddles();
     drawFountain();
     const near = state.mode === 'title' ? null : nearestSpot();
     drawSpots(near);

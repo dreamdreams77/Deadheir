@@ -149,6 +149,17 @@ const P = (() => {
     c.globalAlpha = 1;
   }
 
+  // Soft contact shadow, pushed a little left: away from the moon in the upper right.
+  function shadow(c, x, y, rx, ry, a = 0.5) {
+    c.save();
+    c.translate(x - rx * 0.22, y); c.scale(1, ry / rx);
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, `rgba(2,3,10,${a})`); g.addColorStop(0.6, `rgba(2,3,10,${a * 0.45})`); g.addColorStop(1, 'rgba(2,3,10,0)');
+    c.globalAlpha = 1; c.fillStyle = g;
+    c.beginPath(); c.arc(0, 0, rx, 0, TAU); c.fill();
+    c.restore();
+  }
+
   // ---------------------------------------------------------------- trees
   function tree(c, r, x, y, ht, o = {}) {
     const type = o.type || 'oak';
@@ -180,6 +191,7 @@ const P = (() => {
       }
     }
 
+    shadow(c, x, y + 2, ht * 0.2, ht * 0.03);
     // roots / flare at the base
     for (let i = 0; i < 4; i++) {
       const s = (i - 1.5) * ht * 0.03;
@@ -214,6 +226,7 @@ const P = (() => {
   }
 
   function pine(c, r, x, y, ht, o = {}) {
+    shadow(c, x, y + 1, ht * 0.18, ht * 0.025, 0.4);
     const col = o.col || [200, 25, 14];
     const rim = o.rim || [200, 30, 40];
     brush(c, r, [[x, y], [x + (r() - 0.5) * 3, y - ht]], Math.max(1.5, ht * 0.03), o.bark || [230, 15, 10], 0.9, { k: 2 });
@@ -249,5 +262,5 @@ const P = (() => {
     c.globalAlpha = 1;
   }
 
-  return { TAU, rng, hash, noise, fbm, hsl, dab, clump, brush, paintFill, tree, pine, grass };
+  return { TAU, rng, hash, noise, fbm, hsl, dab, clump, brush, paintFill, shadow, tree, pine, grass };
 })();
