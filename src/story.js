@@ -56,6 +56,45 @@ const STORY = {
     ],
     note: "Halloway's keys: cellar, pantry, and the strongroom with the will.",
   },
+  echo_willow: {
+    echo: true,
+    title: 'Two Boys and a Knife',
+    text: [
+      'Under the willow, laughter from years ago. Two boys are carving letters into the bark: A.V. and E.V.',
+      '"When you\'re lord of Vanehold," says the younger one, "will you still let me climb this tree?"',
+      '"I\'ll give you the whole tree, Edmund."',
+    ],
+    note: 'Edmund envied you. He also loved you.',
+  },
+  echo_gazebo: {
+    echo: true,
+    title: "Vesper's Confession",
+    text: [
+      'A woman\'s voice, low and shaking. "I married a man thirty years older because my family was drowning in debt."',
+      '"I have kept his house and his name. Let me have one thing that is mine."',
+      'She was talking to the moon. Or to you.',
+    ],
+    note: "Lady Vesper's secret was loneliness, not murder.",
+  },
+  echo_steward: {
+    echo: true,
+    title: "The Steward's Prayer",
+    text: [
+      'An old man whispers by the path, his breath fogging in the cold.',
+      '"Forty years I have kept this house. I closed your father\'s eyes. I will not stand by while strangers carry the portraits out the door. Forgive me, old friend."',
+    ],
+    note: 'Halloway believed he was saving Vanehold.',
+  },
+  echo_heir: {
+    echo: true,
+    title: 'Your Own Voice',
+    text: [
+      'You hear yourself, the night before the feast.',
+      '"The debts are too deep, Halloway. I\'ll sell Vanehold in the spring. Find yourself a cottage by the sea. You\'ve earned your rest."',
+      'You meant it kindly. He did not hear it that way.',
+    ],
+    note: 'You told Halloway you would sell the house.',
+  },
   door: {
     title: 'The Door of Vanehold',
     locked: 'The great door does not open for you. The house knows you do not yet understand.',
@@ -71,12 +110,31 @@ const SUSPECTS = [
 const CULPRIT = 'halloway';
 
 const ENDINGS = {
-  right: [
-    'One by one, the lamps of Vanehold gutter out.',
-    'In the steward\'s study, Halloway looks up from your father\'s will and sees you in the black glass of the window. The pen falls from his hand.',
-    'By dawn he has confessed to the constable. The last leaf falls, and you go with it, light at last.',
-  ],
   wrong: 'The name falls into silence. The house does not believe you. Think on what you have found.',
+  confront: knows => [
+    'In the steward\'s study, Halloway looks up from your father\'s will and sees you in the black glass of the window. The pen falls from his hand.',
+    knows
+      ? '"You were going to sell her," he whispers. "Forty years. I could not let them take her apart, stone by stone."'
+      : '"Master Aldric," he whispers. "I did it for the house. Only for the house."',
+    'He does not run. He waits to learn what you will do.',
+  ],
+  justice: {
+    title: 'Justice',
+    text: [
+      'One by one, the lamps of Vanehold gutter out. Every mirror in the house fogs with your name.',
+      'By dawn Halloway is shaking at the constable\'s door with the empty poison tins in his hands.',
+      'The last leaf falls, and you go with it, light at last.',
+    ],
+  },
+  mercy: {
+    title: 'Mercy',
+    text: [
+      'You do not rattle the windows. You only stand at the foot of his bed, the way you did as a boy after a nightmare.',
+      'Halloway weeps. At dawn he walks to the village by himself and tells the constable everything. Then he asks to see Edmund.',
+      'Vanehold passes to your brother, who keeps the willow and the old servants both. The last leaf falls, and you go with it, lighter than you expected.',
+    ],
+  },
+  understood: 'In the end you understood all of them: the brother, the stepmother, the steward. Even yourself.',
 };
 
 // Side quest: a rattling robot skeleton in a blue helmet, resting in the Vane mausoleum.
@@ -99,6 +157,7 @@ const BONES = {
     'Three shots on screen at once. That\'s the rule. Don\'t ask me why.',
     'If you see a mad scientist, you didn\'t see me.',
   ],
+  already: 'Wait. Is that... you\'re already carrying all three? Rattle me sideways! Hold still...',
   cell: 'A humming capsule, warm to the touch. It feels like it belongs to someone.',
   ending: 'In the mausoleum, a skeleton in a blue helmet raises his buster in salute.',
 };

@@ -475,7 +475,7 @@ const World = (() => {
   const LAMPS = [1300, 1990, 2860, 3560, 4150];
   for (const lx of LAMPS) {
     add(L.ground, lx - 20, lx + 20, (c, r) => lampPost(c, r, lx, groundY(lx) + 6));
-    LIGHTS.push({ x: lx, y: groundY(lx) - 158, r: 230, col: [255, 170, 90], flick: 1 });
+    LIGHTS.push({ x: lx, y: groundY(lx) - 158, r: 230, col: [255, 170, 90], flick: 1, pool: true });
   }
 
   // gardener's shed -----------------------------------------------------
@@ -571,7 +571,7 @@ const World = (() => {
         if (wy > MTOP + 200 && Math.abs(wx + 22 - DOOR) < 90) continue;
         const on = !!lit[wi++ % lit.length];
         WINDOWS.push({ x: wx, y: wy, on });
-        if (on) LIGHTS.push({ x: wx + 22, y: wy + 46, r: 150, col: [255, 160, 80], flick: 0.3 });
+        if (on) LIGHTS.push({ x: wx + 22, y: wy + 46, r: 150, col: [255, 160, 80], flick: 0.3, pool: wy > MTOP + 200 });
       }
     }
   }
@@ -652,9 +652,14 @@ const World = (() => {
       c.fillStyle = P.hsl(228, 18, 8); c.fillRect(sx - 6, y - 10, 12, 22);
       c.fillStyle = P.hsl(40, 90, 64); P.dab(c, sx, y, 3, 6, 0);
     });
-    LIGHTS.push({ x: sx, y: groundY(DOOR) - 120, r: 170, col: [255, 165, 85], flick: 1 });
+    LIGHTS.push({ x: sx, y: groundY(DOOR) - 120, r: 170, col: [255, 165, 85], flick: 1, pool: true });
   }
   SPOTS.push({ id: 'door', x: DOOR, y: 470 });
+
+  // echoes: pale memories that linger where they happened
+  for (const [id, x] of [['echo_willow', 1150], ['echo_gazebo', 2700], ['echo_steward', 3450], ['echo_heir', 4300]]) {
+    SPOTS.push({ id, x, y: 520 });
+  }
 
   // ---------------------------------------------------------------- chunk cache
   function paintChunk(layer, i, RS) {
