@@ -522,3 +522,26 @@ Object.assign(STORY.m_cook, { relic: true, title: 'Mrs. Pennywick' });
 Object.assign(STORY.m_musicbox, { relic: true });
 Object.assign(STORY.mirrors, { relic: true, title: MIRRORS.title, note: MIRRORS.note });
 Object.assign(STORY.boathouse, { relic: true, title: HALE.title, note: HALE.note });
+
+// The Dead Man's Hand: a casino for ghosts, past the chapel hill.
+const BOUNCER = {
+  name: 'The Bouncer',
+  ask: [
+    'Evening. The Dead Man\'s Hand: aces and eights, no living guests. A hand the size of a dinner plate comes up to stop you.',
+    'You have the sheet. You have the grudge. Good. One question, and then we are all friends. What is the first rule of the house?',
+  ],
+  answers: [
+    { label: 'The house always wins.', ok: true, reply: ['"Correct." He steps aside with a bow so slight it is almost a nod. "The dead always lose, mind, so we get along."'] },
+    { label: 'Everybody is welcome.', ok: false, reply: ['"Wrong, and a bit sad." He folds his arms. "Come back when you have thought about it."'] },
+    { label: 'I have a golden ticket.', ok: 'ticket', reply: ['"A Vane Fair ticket! Where I come from, that is practically a membership." He unhooks the rope.'], fail: ['"Nice try." He taps his sunglasses. "You have not got one, and I can see through the pockets of the dead."'] },
+  ],
+  welcome: 'He slides a tray of ghost chips across to you, a hundred, cold as pebbles. "House money. Spend it badly."',
+  after: ['"Go on in. Mind Madame Mort. She counts cards, and so do the cards."', '"The bar does a mean pho."'],
+  shut: 'A hand lands flat on the doorframe. "Talk to me first," says the bouncer.',
+  ending: 'Out past the chapel, a casino sign flickers: THE DEAD MAN\'S HAND. Somebody inside is losing gracefully.',
+};
+Object.assign(STORY, {
+  casino_roller: { relic: true, title: 'The High Roller', note: 'You left the Dead Man\'s Hand with three hundred chips or more. Madame Mort has not forgiven you.' },
+  casino_regular: { relic: true, title: 'The Regular', note: 'You have tried everything on Mr. Vigil\'s menu: pho, peanuts, cheese and crackers, ginger beer, a gin and tonic and tap water.' },
+});
+Object.assign(HOUSE_ENDINGS, { casino: 'At the Dead Man\'s Hand, a pale dealer deals one card face up for the heir who beat the house. It is the ace of hearts.' });

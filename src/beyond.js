@@ -5,7 +5,7 @@
 // lake glints and the chapel's candle flicker are live.
 const Beyond = (() => {
   const { groundY, addObject, atDepth } = World;
-  const GATE_X = 8480, MIRRORS_X = 8830, PATCH_X = 9330, BOATHOUSE_X = 11900, CHAPEL_X = 13150, BELL_X = 13350, VISTA_X = 13640;
+  const CASINO_X = 14560, BOUNCER_X = 14270, GATE_X = 8480, MIRRORS_X = 8830, PATCH_X = 9330, BOATHOUSE_X = 11900, CHAPEL_X = 13150, BELL_X = 13350, VISTA_X = 13640;
   const LAKE_X0 = 10700, LAKE_X1 = 12250;
 
   // Moon Apples for the scarecrow: [id, x, y]
@@ -14,12 +14,12 @@ const Beyond = (() => {
     { id: 'a4', x: 10260, y: 458 }, { id: 'a5', x: 10430, y: 356 }, { id: 'a6', x: 10140, y: 522 },
   ];
   // [from, to, count] patrols
-  const SHADE_ZONES = [[9880, 10260, 2], [11050, 11540, 2], [12480, 12900, 2], [13330, 13560, 1]];
+  const SHADE_ZONES = [[9880, 10260, 2], [11050, 11540, 2], [12480, 12900, 2], [13330, 13560, 1], [14000, 14180, 1]];
   // gas lamps double as lamplight waymarkers
-  const LAMPS = [8560, 9250, 10650, 12100];
+  const LAMPS = [8560, 9250, 10650, 12100, 13960];
   const LAMP_NAMES = {
     1300: 'Graveyard Gate', 1990: 'Shed Lane', 2860: 'The Fountain Walk', 3560: 'Cellar Stair', 4150: 'Manor Steps',
-    5340: 'The Fair Gate', 7800: 'The Carousel', 8560: 'Hollow Gate', 9250: 'Orchard Lane', 10650: 'Mirror Lake', 12100: 'Chapel Steps',
+    5340: 'The Fair Gate', 7800: 'The Carousel', 8560: 'Hollow Gate', 9250: 'Orchard Lane', 10650: 'Mirror Lake', 12100: 'Chapel Steps', 13960: 'Casino Row',
   };
 
   const sign = (c, r, x, y, w, text, size = 16) => {
@@ -334,6 +334,67 @@ const Beyond = (() => {
     for (let wx = 13440; wx < 13800; wx += 30) P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(wx, y - 30, 28, 34); }, [wx, y - 30, 28, 34], [222, 10, 24 + (wx % 3) * 3], { ang: 0.3, len: 8, w: 2.2 });
   });
 
+
+  // ---------------------------------------------------------------- the Dead Man's Hand
+  addObject('ground', CASINO_X - 300, CASINO_X + 300, (c, r) => {
+    const x = CASINO_X, y = groundY(x) + 8, w = 420, h = 330, top = y - h;
+    P.shadow(c, x, y + 2, w * 0.7, 12, 0.6);
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - w / 2, top, w, h); }, [x - w / 2, top, w, h], [345, 28, 10], { ang: 1.57, len: 30, w: 4, angJ: 0.05, density: 70, lf: px => (px - x) * 0.03 });
+    // gold trim, a marquee and the sign
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - w / 2 - 10, top - 14, w + 20, 18); }, [x - w / 2 - 10, top - 14, w + 20, 18], [44, 55, 30], { ang: 0, len: 20, w: 3 });
+    c.fillStyle = '#07040a'; c.fillRect(x - 170, top + 22, 340, 78);
+    c.strokeStyle = P.hsl(44, 70, 48); c.lineWidth = 3; c.strokeRect(x - 170, top + 22, 340, 78);
+    c.font = 'bold 30px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = P.hsl(350, 90, 52); c.fillText("THE DEAD MAN'S HAND", x, top + 52);
+    c.font = 'italic 16px Georgia, serif'; c.fillStyle = P.hsl(44, 60, 66, 0.9); c.fillText('aces and eights · no living guests', x, top + 82);
+    c.textBaseline = 'alphabetic';
+    for (let i = 0; i < 30; i++) { c.fillStyle = P.hsl(i % 2 ? 44 : 350, 90, 62, 0.95); P.dab(c, x - 170 + i * (340 / 29), top + 22, 3, 3, 0); P.dab(c, x - 170 + i * (340 / 29), top + 100, 3, 3, 0); }
+    // a fan of five cards: the dead man's hand, aces and eights
+    const fan = [[-0.5, 'A', '♠'], [-0.25, 'A', '♣'], [0, '8', '♠'], [0.25, '8', '♣'], [0.5, 'J', '♦']];
+    for (const [a, rk, su] of fan) {
+      c.save(); c.translate(x, top + 190); c.rotate(a);
+      c.fillStyle = P.hsl(44, 25, 80); c.fillRect(-20, -62, 40, 62); c.strokeStyle = '#111'; c.lineWidth = 1.2; c.strokeRect(-20, -62, 40, 62);
+      c.fillStyle = su === '♦' ? '#a01020' : '#111'; c.font = 'bold 18px Georgia, serif'; c.textAlign = 'center'; c.fillText(rk, -8, -42); c.font = '22px Georgia, serif'; c.fillText(su, 0, -18);
+      c.restore();
+    }
+    // tall windows with a warm, wrong light
+    for (const wx of [x - 170, x + 170]) {
+      c.fillStyle = P.hsl(30, 85, 38, 0.8); c.fillRect(wx - 28, top + 120, 56, 120);
+      c.strokeStyle = '#0a0508'; c.lineWidth = 4; c.strokeRect(wx - 28, top + 120, 56, 120); c.beginPath(); c.moveTo(wx, top + 120); c.lineTo(wx, top + 240); c.moveTo(wx - 28, top + 180); c.lineTo(wx + 28, top + 180); c.stroke();
+      c.fillStyle = 'rgba(5,3,8,0.85)'; P.dab(c, wx - 8, top + 200, 6, 10, 0); P.dab(c, wx + 12, top + 210, 7, 12, 0);
+    }
+    // doorway and red carpet
+    c.fillStyle = '#05030a'; c.beginPath(); c.moveTo(x - 50, y); c.lineTo(x - 50, y - 130); c.quadraticCurveTo(x, y - 190, x + 50, y - 130); c.lineTo(x + 50, y); c.fill();
+    c.strokeStyle = P.hsl(44, 70, 46); c.lineWidth = 4; c.stroke();
+    c.fillStyle = P.hsl(350, 55, 22); c.beginPath(); c.moveTo(x - 46, y); c.lineTo(x - 80, y + 22); c.lineTo(x + 80, y + 22); c.lineTo(x + 46, y); c.fill();
+    P.dab(c, x, y - 30, 18, 4, 0);
+  });
+  World.LIGHTS.push(
+    { x: CASINO_X, y: groundY(CASINO_X) - 100, r: 300, col: [255, 70, 80], flick: 1.1, pool: true },
+    { x: CASINO_X - 170, y: groundY(CASINO_X) - 180, r: 160, col: [255, 170, 80], flick: 0.9, pool: false },
+    { x: CASINO_X + 170, y: groundY(CASINO_X) - 180, r: 160, col: [255, 170, 80], flick: 0.9, pool: false },
+  );
+  // the bouncer: broad shoulders, a suit the colour of the night, dark glasses
+  addObject('ground', BOUNCER_X - 90, BOUNCER_X + 90, (c, r) => {
+    const x = BOUNCER_X, y = groundY(x) + 8;
+    P.shadow(c, x, y + 2, 50, 6, 0.55);
+    // velvet rope posts
+    for (const px of [x - 70, x + 70]) { P.brush(c, r, [[px, y], [px, y - 56]], 4, [44, 55, 30], 1, { k: 2 }); c.fillStyle = P.hsl(44, 60, 46); P.dab(c, px, y - 58, 6, 6, 0); }
+    c.strokeStyle = P.hsl(350, 55, 24); c.lineWidth = 5; c.beginPath(); c.moveTo(x - 70, y - 50); c.quadraticCurveTo(x - 35, y - 34, x - 24, y - 46); c.moveTo(x + 24, y - 46); c.quadraticCurveTo(x + 35, y - 34, x + 70, y - 50); c.stroke();
+    // legs, huge torso, folded arms
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.rect(x - 24, y - 70, 48, 70); }, [x - 24, y - 70, 48, 70], [240, 14, 8], { ang: 1.57, len: 14, w: 3 });
+    P.paintFill(c, r, cc => { cc.beginPath(); cc.moveTo(x - 46, y - 74); cc.lineTo(x - 38, y - 170); cc.lineTo(x + 38, y - 170); cc.lineTo(x + 46, y - 74); cc.closePath(); }, [x - 46, y - 170, 92, 96], [240, 14, 10], { ang: 1.5, len: 16, w: 3.4, lf: px => (px - x) * 0.1 });
+    c.fillStyle = P.hsl(40, 10, 74); c.beginPath(); c.moveTo(x - 10, y - 168); c.lineTo(x, y - 120); c.lineTo(x + 10, y - 168); c.fill();
+    c.fillStyle = P.hsl(350, 60, 24); c.fillRect(x - 3, y - 158, 6, 38);
+    c.strokeStyle = P.hsl(240, 12, 15); c.lineWidth = 14; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 38, y - 150); c.lineTo(x + 4, y - 120); c.moveTo(x + 38, y - 150); c.lineTo(x - 4, y - 112); c.stroke();
+    c.fillStyle = P.hsl(30, 10, 42); P.dab(c, x, y - 192, 22, 24, 0);
+    c.fillStyle = '#050508'; c.fillRect(x - 20, y - 200, 40, 10); c.fillStyle = 'rgba(160,190,255,0.35)'; c.fillRect(x - 17, y - 198, 10, 2);
+    c.strokeStyle = '#0a0a0e'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x - 8, y - 176); c.lineTo(x + 8, y - 176); c.stroke();
+    // a tiny earpiece, for nobody
+    c.fillStyle = '#111'; P.dab(c, x + 22, y - 190, 3, 5, 0);
+  });
+  World.SPOTS.push({ id: 'bouncer', x: BOUNCER_X, y: 400 }, { id: 'casino', x: CASINO_X, y: 440 });
+
   World.SPOTS.push(
     { id: 'mirrors', x: MIRRORS_X, y: 440 },
     { id: 'patch', x: PATCH_X, y: 430 },
@@ -364,7 +425,7 @@ const Beyond = (() => {
   }
 
   return {
-    GATE_X, MIRRORS_X, PATCH_X, BOATHOUSE_X, CHAPEL_X, BELL_X, VISTA_X, APPLES, SHADE_ZONES, LAMPS, LAMP_NAMES,
+    CASINO_X, BOUNCER_X, GATE_X, MIRRORS_X, PATCH_X, BOATHOUSE_X, CHAPEL_X, BELL_X, VISTA_X, APPLES, SHADE_ZONES, LAMPS, LAMP_NAMES,
     drawBack: drawLake,
   };
 })();

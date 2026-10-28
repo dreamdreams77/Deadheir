@@ -127,6 +127,58 @@
   body.compact #mini-title { font-size: 18px; }
   body.compact #mini-hud { font-size: 15px; }
 
+  /* the Dead Man's Hand */
+  #casino { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(4,2,8,0.8);
+    opacity: 0; pointer-events: none; transition: opacity .3s; padding: 10px; }
+  #casino.show { opacity: 1; pointer-events: auto; }
+  .casino-card { width: min(780px, 100%); max-height: 94vh; max-height: 94cqh; overflow: auto; background: #120a10; border: 1px solid rgba(220,60,80,0.45);
+    box-shadow: 0 20px 60px #000, 0 0 40px rgba(200,30,60,0.15); }
+  .casino-top { display: flex; align-items: center; gap: 14px; padding: 8px 14px; }
+  .casino-top h3 { font-family: var(--fell); font-weight: 400; font-size: 24px; color: #ff8090; margin: 0; flex: 1; }
+  #casino-chips { font-family: var(--fell); font-size: 20px; color: var(--gold); }
+  .casino-top .btn { font-size: 15px; padding: 4px 14px; }
+  #casino-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 8px; }
+  #casino-tabs button { font-family: var(--serif); font-size: 17px; color: var(--ink-dim); background: transparent; border: 1px solid rgba(240,201,135,0.2); padding: 5px 14px; cursor: pointer; }
+  #casino-tabs button.on { color: var(--gold); border-color: var(--gold); background: rgba(240,201,135,0.08); }
+  #casino-main { padding: 14px 18px 18px; background: radial-gradient(ellipse at center, #14402c 0%, #0b2218 80%); min-height: 300px; text-align: center; }
+  #casino-main .msg { font-size: 19px; margin: 0 0 10px; min-height: 1.4em; }
+  #casino-main .warn { color: #ff9aa6; font-style: italic; }
+  #casino-main .pays { font-size: 14px; color: var(--ink-dim); margin: 6px 0; }
+  #casino-main .row, #casino-main .opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 10px 0; }
+  #casino-main .btn { font-size: 18px; padding: 6px 20px; }
+  #casino-main .bet { margin: 10px 0; font-size: 18px; }
+  #casino-main .bet b { display: inline-block; min-width: 3.2em; color: var(--gold); }
+  #casino-main .bet button, #casino-main .opt { font-family: var(--serif); font-size: 17px; color: var(--ink); background: rgba(255,255,255,0.06); border: 1px solid rgba(240,201,135,0.25); padding: 4px 12px; cursor: pointer; margin: 0 2px; }
+  #casino-main .opt.on { color: var(--gold); border-color: var(--gold); background: rgba(240,201,135,0.12); }
+  #casino-main .opt small { color: var(--ink-dim); margin-left: 4px; }
+  #casino-main button:disabled { opacity: 0.4; cursor: wait; }
+  .hand { margin: 10px 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+  .hand i { width: 100%; font-size: 15px; color: var(--ink-dim); }
+  .card { display: inline-block; width: 54px; height: 76px; line-height: 76px; background: #ece4d0; color: #1a1418; font-family: Georgia, serif; font-size: 22px; font-weight: bold;
+    border-radius: 5px; box-shadow: 0 3px 8px rgba(0,0,0,0.6); user-select: none; }
+  .card.red { color: #b01828; }
+  .card.back { background: repeating-linear-gradient(45deg, #3a1020, #3a1020 6px, #511830 6px, #511830 12px); color: #d8b0b8; }
+  .card.held { transform: translateY(-10px); box-shadow: 0 0 0 3px var(--gold), 0 3px 8px rgba(0,0,0,0.6); }
+  .card[data-act] { cursor: pointer; }
+  .kgrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; max-width: 460px; margin: 8px auto; }
+  .kn { font-family: var(--serif); font-size: 17px; color: var(--ink); background: rgba(0,0,0,0.35); border: 1px solid rgba(240,201,135,0.25); padding: 6px 0; cursor: pointer; }
+  .kn.picked { background: rgba(240,201,135,0.25); border-color: var(--gold); }
+  .kn.hit { box-shadow: inset 0 0 0 2px #ff6a7a; color: #fff; }
+  .kn.picked.hit { background: #b01828; }
+  .wheel { width: 84px; height: 84px; margin: 0 auto 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--fell); font-size: 32px; color: #fff;
+    border: 4px solid var(--gold); box-shadow: 0 0 20px rgba(0,0,0,0.6); }
+  .wheel.red { background: #a01424; } .wheel.black { background: #15131a; } .wheel.green { background: #1d6a3a; }
+  .wheel.spin { animation: wspin .45s linear infinite; }
+  @keyframes wspin { to { transform: rotate(360deg); } }
+  body.mini-open #touch { display: none; }
+  body.compact .casino-top h3 { font-size: 18px; }
+  body.compact #casino-main { padding: 8px 12px 10px; min-height: 0; }
+  body.compact .card { width: 42px; height: 58px; line-height: 58px; font-size: 17px; }
+  /* after a gin and tonic */
+  body.tipsy #stage { animation: tipsy 3.2s ease-in-out infinite; }
+  @keyframes tipsy { 0%, 100% { transform: rotate(-0.6deg) translateX(-4px); filter: blur(0.6px); } 50% { transform: rotate(0.7deg) translateX(5px); filter: blur(1.2px); } }
+  @media (prefers-reduced-motion: reduce) { body.tipsy #stage, .wheel.spin { animation: none; } }
+
   /* phone helpers */
   .rot, #rotate-hint { display: none; }
   body.touch.portrait .rot, body.sideways .rot { display: inline-block; }
@@ -212,6 +264,14 @@
     <div class="grp"><button id="t-fire" aria-label="Fire buster" hidden>●</button><button id="t-act" aria-label="Examine">✦</button><button id="t-jump" aria-label="Jump">⤒</button></div>
   </div>
 
+  <div id="casino" role="dialog" aria-label="The Dead Man's Hand">
+    <div class="casino-card">
+      <div class="casino-top"><h3>The Dead Man's Hand</h3><span id="casino-chips"></span><button class="btn" id="casino-close">Leave</button></div>
+      <div id="casino-tabs"></div>
+      <div id="casino-main"></div>
+    </div>
+  </div>
+
   <div id="mini" role="dialog" aria-label="Fairground game">
     <div class="mini-card">
       <div class="mini-top"><h3 id="mini-title"></h3><span id="mini-hud"></span><button class="btn" id="mini-close">Leave</button></div>
@@ -229,6 +289,7 @@
   <script src="src/carnival.js"></script>
   <script src="src/beyond.js"></script>
   <script src="src/mansion.js"></script>
+  <script src="src/casino.js"></script>
   <script src="src/minigames.js"></script>
   <script src="src/game.js"></script>
 </body>

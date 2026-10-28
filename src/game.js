@@ -189,8 +189,9 @@
     // the carousel, the house and the Hollow Reach
     carA: 0, carSpeed: 0.12, carRide: null, ring: null, rings: 0,
     inside: false, room: '', studyOpen: false, icheck: null, xf: null, relics: new Set(), cookMet: false, musicbox: false,
-    patchMet: false, apples: new Set(), orchardKey: false, mirrors: new Set(), mirrorsDone: false, robert: false, bell: false,
+    barTried: new Set(), patchMet: false, apples: new Set(), orchardKey: false, mirrors: new Set(), mirrorsDone: false, robert: false, bell: false,
     lamps: new Set(), will: false,
+    chips: 0, casinoOpen: false, wobble: 0,
   };
   const player = { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1, sw: 0, swv: 0, lantern: [0, 0] };
   const CLUES = Object.keys(STORY).filter(k => STORY[k].clue);
@@ -424,6 +425,7 @@
     const ex = [];
     if (state.apples.size && !state.orchardKey) ex.push(`Moon Apples ${state.apples.size} / 6`);
     if (state.rings && !state.musicbox) ex.push(`Brass rings ${state.rings} / 3`);
+    if (state.casinoOpen) ex.push(`Ghost chips ${state.chips}`);
     $('extras').hidden = !ex.length;
     $('extras').textContent = ex.join(' · ');
     $('t-fire').hidden = !state.buster;
@@ -679,6 +681,49 @@
     drawGhost();
   }
 
+  // ---- the Dead Man's Hand
+  function talkBouncer() {
+    const B = BOUNCER;
+    if (state.casinoOpen) return openDialog(B.name, [B.after[Math.floor(Math.random() * B.after.length)]]);
+    const pass = a => {
+      state.casinoOpen = true; state.chips = 100; Audio.chime(660); updateHud();
+      openDialog(B.name, [...a.reply, B.welcome], () => toast('Ghost chips: 100'));
+    };
+    openDialog(B.name, B.ask, null, B.answers.map(a => ({
+      label: a.label,
+      fn: () => {
+        if (a.ok === true || (a.ok === 'ticket' && state.ticket)) pass(a);
+        else openDialog(B.name, a.fail || a.reply);
+      },
+    })));
+  }
+  function enterCasino() {
+    if (!state.casinoOpen) return openDialog(BOUNCER.name, [BOUNCER.shut]);
+    state.mode = 'casino'; state.charging = false;
+    document.body.classList.add('mini-open');
+    Casino.start({
+      chips: state.chips,
+      tried: state.barTried,
+      sfx: name => Audio.booth(name),
+      onChips: n => { state.chips = n; updateHud(); },
+      onOrder: (id, tried) => {
+        state.barTried = new Set(tried);
+        if (id === 'pho') { state.lantern = state.maxLantern; toast('Your lantern burns full'); }
+        else if (id === 'cheese') { state.lantern = Math.min(state.maxLantern, state.lantern + 1); toast('A flame returns'); }
+        else if (id === 'gin') state.wobble = 30;
+        else if (id === 'water') state.wobble = 0;
+        updateHud();
+        if (tried.size >= 6) addRelic('casino_regular');
+      },
+      onClose: chips => {
+        state.chips = chips; state.mode = 'play';
+        document.body.classList.remove('mini-open');
+        if (chips >= 300) addRelic('casino_roller');
+        updateHud();
+      },
+    });
+  }
+
   // ---- the Hall of Mirrors
   function enterMirrors() {
     const T = 'The Hall of Mirrors';
@@ -786,6 +831,8 @@
     if (spot.id === 'lamp') return lampTravel(spot);
     if (spot.id === 'carousel') return mountCarousel();
     if (spot.id === 'mirrors') return enterMirrors();
+    if (spot.id === 'bouncer') return talkBouncer();
+    if (spot.id === 'casino') return enterCasino();
     if (spot.id === 'patch') return talkPatch();
     if (spot.id === 'boathouse') return enterBoathouse();
     if (spot.id === 'bell') return ringBell();
@@ -848,6 +895,8 @@
     if (state.mirrorsDone) pages.push(MIRRORS.ending);
     if (kind === 'mercy' && state.echoes.has('chapel')) pages.push(HOUSE_ENDINGS.father);
     if (state.bell) pages.push(BELL.ending);
+    if (state.casinoOpen) pages.push(BOUNCER.ending);
+    if (state.relics.has('casino_roller')) pages.push(HOUSE_ENDINGS.casino);
     $('ending-title').textContent = e.title;
     $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
     $('ending').classList.add('show');
@@ -924,8 +973,9 @@
       maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null,
       carA: 0, carSpeed: 0.12, carRide: null, ring: null, rings: 0, inside: false, room: '', studyOpen: false, icheck: null, xf: null,
       relics: new Set(), cookMet: false, musicbox: false, patchMet: false, apples: new Set(), orchardKey: false, mirrors: new Set(),
-      mirrorsDone: false, robert: false, bell: false, lamps: new Set(), will: false,
+      mirrorsDone: false, robert: false, bell: false, lamps: new Set(), will: false, chips: 0, casinoOpen: false, wobble: 0, barTried: new Set(),
     });
+    document.body.classList.remove('tipsy');
     state.buster = false; state.lantern = 3; state.checkpoint = 200; state.inv = 0; state.fade = 0; state.respawning = false;
     Object.assign(player, { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1 });
     spawnShades(); shots.length = 0;
@@ -939,6 +989,7 @@
   // ---------------------------------------------------------------- input
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
+    if (state.mode === 'casino') { if (k === 'escape') Casino.close(); return; } // the casino is clicked and tapped; keys keep their normal job
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'enter', 'tab'].includes(k)) e.preventDefault();
     if (state.mode === 'title') { if (k === 'enter' || k === ' ') begin(); return; }
     if (state.mode === 'mini') { Minigames.key(e, true); return; }
@@ -1141,6 +1192,8 @@
     const carTarget = state.carRide ? 0.95 + cdir * 0.5 : state.ticket ? 0.45 : 0.12;
     state.carSpeed += (carTarget - state.carSpeed) * Math.min(1, dt * 1.6);
     state.carA += dt * state.carSpeed;
+    if (state.wobble > 0) state.wobble = Math.max(0, state.wobble - dt);
+    document.body.classList.toggle('tipsy', state.wobble > 0);
     if (state.mode === 'play') updateCarRide();
     const outside = !state.inside && state.mode !== 'title';
     const fairLevel = clamp((player.x - 5150) / 350, 0, 1) * clamp((8900 - player.x) / 350, 0, 1);
@@ -1662,6 +1715,7 @@
       case 'patch': return state.orchardKey;
       case 'boathouse': return state.robert;
       case 'bell': return state.bell;
+      case 'bouncer': return state.casinoOpen;
       case 'm_exit': case 'm_back': case 'm_stairs_up': case 'm_stairs_down': return true;
       case 'm_atlas': return state.studyOpen;
       case 'm_musicbox': return state.musicbox;
@@ -1704,10 +1758,10 @@
     const cy = state.camY;
     const sx = toScreen(near.x, 1);
     const sy = Math.min(near.y, player.y - 165) + cy - 10 + Math.sin(state.t * 3) * 3;
-    const label = near.lamp ? 'Lamplight' : ['door', 'mirrors', 'boathouse', 'chapel'].includes(near.id) ? 'Enter'
+    const label = near.lamp ? 'Lamplight' : ['door', 'mirrors', 'boathouse', 'chapel', 'casino'].includes(near.id) ? 'Enter'
       : near.id === 'm_exit' || near.id === 'm_back' ? 'Leave'
       : near.id === 'm_stairs_up' ? 'Climb' : near.id === 'm_stairs_down' ? 'Descend'
-      : ['bones', 'barker', 'patch', 'm_cook'].includes(near.id) ? 'Talk'
+      : ['bones', 'barker', 'patch', 'm_cook', 'bouncer'].includes(near.id) ? 'Talk'
       : near.id === 'carousel' ? 'Ride' : near.id === 'bell' ? 'Ring'
       : Minigames.has(near.id) ? 'Play' : near.id === 'wheel' ? (state.ticket ? 'Ride' : 'Examine')
       : STORY[near.id]?.echo ? 'Listen' : state.seen.has(near.id) ? 'Recall' : 'Examine';

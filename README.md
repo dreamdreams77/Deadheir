@@ -68,6 +68,19 @@ The path now continues past the fair, through a wrought-iron gate into country t
 - **The chapel on the hill:** your father waits in the crypt. Ring the bell outside. Past the chapel is a lookout over the whole estate.
 - **Lamplight travel:** every gas lamp is a waymarker. Press **E** at a lamp to walk to any lamp you have already lit.
 
+## The Dead Man's Hand
+
+Far past the chapel hill, a casino for ghosts glows red against the dark. A bouncer in dark glasses guards the door and asks one question: *what is the first rule of the house?* Answer right (or wave a golden ticket) and he hands you 100 ghost chips.
+
+| Table | How it plays |
+| --- | --- |
+| Blackjack | Hit, stand or double. Blackjack pays 3 to 2. The dealer stands on 17 |
+| Keno | Pick up to six of forty numbers; ten are drawn |
+| Poker | Jacks-or-better video poker: deal, tap cards to hold, draw |
+| Roulette | European wheel. Red/black, odd/even, low/high, dozens (2:1) or a single number (35:1) |
+
+**The bar** serves pho (relights your lantern), peanuts, cheese and crackers (a flame back), ginger beer, a gin and tonic (the room sways for a while) and tap water (free, and steadies you). Try everything on the menu for a journal relic, and leave with 300 chips or more for another. If you go broke, the bartender will spot you a loan, three times at most.
+
 ## How the art works
 
 Every image is painted at load time from code. There are no bitmap assets.
