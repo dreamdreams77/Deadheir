@@ -105,6 +105,27 @@
   #touch button { width: 68px; height: 68px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(14,14,24,0.5); color: var(--gold);
     font-size: 26px; touch-action: none; }
   body.touch #dialog { bottom: 120px; }
+  /* fairground booth games */
+  #mini { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2,3,8,0.72);
+    opacity: 0; pointer-events: none; transition: opacity .3s; padding: 12px; }
+  #mini.show { opacity: 1; pointer-events: auto; }
+  .mini-card { width: min(960px, 100%, calc((100cqh - 90px) * 16 / 9)); background: #120c0a; border: 1px solid var(--edge);
+    box-shadow: 0 20px 60px #000; }
+  .mini-top { display: flex; align-items: center; gap: 14px; padding: 8px 12px; }
+  #mini-title { font-family: var(--fell); font-weight: 400; font-size: 24px; color: var(--gold); margin: 0; }
+  #mini-hud { flex: 1; font-size: 18px; color: var(--ink); }
+  .mini-top .btn { font-size: 15px; padding: 4px 14px; }
+  .mini-stage { position: relative; }
+  #mini-cv { display: block; width: 100%; aspect-ratio: 16 / 9; touch-action: none; cursor: crosshair; }
+  #mini-msg { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(8,6,10,0.7); text-align: center; padding: 20px; }
+  #mini-msg.show { display: flex; }
+  #mini-text { max-width: 30em; font-size: clamp(17px, 2.2cqw, 22px); line-height: 1.45; margin: 0 0 16px; }
+  #mini-btns { display: flex; gap: 12px; }
+  body.mini-open #touch { display: none; }
+  body.compact #mini-title { font-size: 18px; }
+  body.compact #mini-hud { font-size: 15px; }
+
   /* phone helpers */
   .rot, #rotate-hint { display: none; }
   body.touch.portrait .rot, body.sideways .rot { display: inline-block; }
@@ -164,6 +185,8 @@
       <ol id="journal-list"></ol>
       <h3>Echoes</h3>
       <ol id="echo-list"></ol>
+      <h3>Prizes from the fair</h3>
+      <ol id="prize-list"></ol>
       <h3>Side quest: Blue Bones</h3>
       <p id="side"></p>
       <button class="btn" id="journal-close">Close</button>
@@ -181,11 +204,22 @@
     <div class="grp"><button id="t-fire" aria-label="Fire buster" hidden>●</button><button id="t-act" aria-label="Examine">✦</button><button id="t-jump" aria-label="Jump">⤒</button></div>
   </div>
 
+  <div id="mini" role="dialog" aria-label="Fairground game">
+    <div class="mini-card">
+      <div class="mini-top"><h3 id="mini-title"></h3><span id="mini-hud"></span><button class="btn" id="mini-close">Leave</button></div>
+      <div class="mini-stage">
+        <canvas id="mini-cv" aria-label="Fairground game"></canvas>
+        <div id="mini-msg"><p id="mini-text"></p><div id="mini-btns"></div></div>
+      </div>
+    </div>
+  </div>
 </div>
 
   <script src="src/paint.js"></script>
   <script src="src/world.js"></script>
   <script src="src/story.js"></script>
+  <script src="src/carnival.js"></script>
+  <script src="src/minigames.js"></script>
   <script src="src/game.js"></script>
 </body>
 </html>

@@ -25,6 +25,20 @@ Four optional **echoes** linger on the grounds: pale blue memories you can liste
 - **Shades** drift along parts of the path. Each touch dims your lantern by one flame. When all three go out, you wake at the last gas lamp you passed. You can jump over shades, and passing a lamp relights your lantern.
 - **Blue Bones** rattles around in the Vane mausoleum: a robot skeleton in a battered blue helmet, an homage to a certain blue bomber. He has lost three Energy Cells. One is above the tallest headstone, one is high over the fountain (climb the basin rim, then the bowl), and one is out where the shades patrol by the cellar. Bring them back and he refits his **Bone Buster** for you. Three pellets can be on screen at once; a charged shot pierces. He also shares something he saw on the night of the feast.
 
+## The Vane Harvest Fair
+
+Past the manor's east wall lies the family's abandoned fairground: a slowly turning ferris wheel, a carousel whose horses still circle, a torn big top, a helter-skelter and a broken roller coaster. **Mister Lamb**, the ghostly barker, still runs five booths:
+
+| Booth | How to play |
+| --- | --- |
+| Duck Shoot | Hold to spray the water gun; knock down 12 ducks in 25 seconds |
+| Balloon Pop | Throw darts at swaying balloons; pop 7 with 10 darts |
+| Ring Toss | Toss rings onto bottle necks (back rows are harder); ring 3 with 10 rings |
+| Milk Cans | Knock all 6 cans off the shelf with 3 balls |
+| Star Shootout | Hold to fire 100 BBs and shoot out the red star |
+
+Aim with the mouse or a finger; on a keyboard, aim with the arrow keys and act with Space. Each prize holds a family memory and goes in the journal. Win all five and Mister Lamb punches a golden ticket for the wheel. The ride lifts you above the whole estate, and your lantern comes back with a fourth flame. Listen at the carousel for one more echo.
+
 ## How the art works
 
 Every image is painted at load time from code. There are no bitmap assets.

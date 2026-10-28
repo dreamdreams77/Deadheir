@@ -3,7 +3,7 @@
 // cached chunks that are painted on demand, so wide layers stay cheap.
 const World = (() => {
   const H = 720;
-  const WORLD_W = 4900;   // walkable playfield width
+  const WORLD_W = 8300;   // walkable playfield width (the fair lies past the manor)
   const MAXVIEW = 1800;   // widest logical viewport we support
   const CH = 512;         // chunk width in layer pixels
   const CELL = 48;        // terrain stroke cell
@@ -21,7 +21,8 @@ const World = (() => {
     { id: 'mid', f: 0.66, scale: 0.8, fog: [32, 38, 66], fogA: [0.08, 0.24] },
     { id: 'near', f: 0.84, scale: 0.9, fog: [24, 28, 52], fogA: [0.03, 0.14] },
     { id: 'ground', f: 1, scale: 1, fog: null },
-    { id: 'fore', f: 1.45, scale: 0.28, fog: [6, 8, 16], fogA: [0.25, 0.1] },
+    // the foreground also paints 600px above the frame, revealed when the camera rises on the wheel
+    { id: 'fore', f: 1.45, scale: 0.28, fog: [6, 8, 16], fogA: [0.25, 0.1], top: -600 },
   ];
 
   const layers = defs.map((d, idx) => ({
@@ -268,14 +269,14 @@ const World = (() => {
       const w = 34 + r() * 22;
       P.paintFill(c, r, cc => {
         cc.beginPath();
-        cc.moveTo(x - w * 0.9, H + 10); cc.quadraticCurveTo(x - w * 0.4, H * 0.5, x - w * 0.5, -240);
-        cc.lineTo(x + w * 0.5, -240); cc.quadraticCurveTo(x + w * 0.3, H * 0.5, x + w, H + 10); cc.closePath();
-      }, [x - w, -240, w * 2, H + 250], [228, 22, 6], { ang: 1.55, len: 40, w: 8, lf: px => Math.max(0, px - x) * 0.25 });
+        cc.moveTo(x - w * 0.9, H + 10); cc.quadraticCurveTo(x - w * 0.4, H * 0.5, x - w * 0.5, -760);
+        cc.lineTo(x + w * 0.5, -760); cc.quadraticCurveTo(x + w * 0.3, H * 0.5, x + w, H + 10); cc.closePath();
+      }, [x - w, -760, w * 2, H + 770], [228, 22, 6], { ang: 1.55, len: 40, w: 8, lf: px => Math.max(0, px - x) * 0.25 });
     });
   }
   for (let x = 400; x < L.fore.width; x += 1500 + ((x * 13) % 700)) {
     add(L.fore, x - 360, x + 360, (c, r) => {
-      const pts = [[x - 340, -240], [x - 280, -20], [x - 100, 30], [x + 100, 50], [x + 330, 20]];
+      const pts = [[x - 400, -760], [x - 340, -240], [x - 280, -20], [x - 100, 30], [x + 100, 50], [x + 330, 20]];
       P.brush(c, r, pts, 18, [228, 22, 6], 1, { taper: 0.7, k: 4 });
       for (let i = 0; i < 14; i++) {
         const t = r(), px = x - 250 + t * 560, py = 20 + Math.sin(t * 3) * 30;
@@ -693,10 +694,11 @@ const World = (() => {
   // ---------------------------------------------------------------- chunk cache
   function paintChunk(layer, i, RS) {
     const s = layer.scale * RS;
+    const top = layer.top || 0;
     const cv = document.createElement('canvas');
-    cv.width = Math.ceil(CH * s); cv.height = Math.ceil(H * s);
+    cv.width = Math.ceil(CH * s); cv.height = Math.ceil((H - top) * s);
     const c = cv.getContext('2d');
-    c.setTransform(s, 0, 0, s, -i * CH * s, 0);
+    c.setTransform(s, 0, 0, s, -i * CH * s, -top * s);
     const x0 = i * CH, x1 = x0 + CH;
     if (layer.terrain) layer.terrain(c, x0, x1);
     for (const o of layer.objs) {
@@ -712,7 +714,7 @@ const World = (() => {
       gr.addColorStop(0, `rgba(${r},${g},${b},${a0})`);
       gr.addColorStop(1, `rgba(${r},${g},${b},${a1})`);
       c.fillStyle = gr;
-      c.fillRect(x0 - 2, 0, CH + 4, H);
+      c.fillRect(x0 - 2, top, CH + 4, H - top);
       c.globalCompositeOperation = 'source-over';
     }
     return cv;
@@ -730,7 +732,7 @@ const World = (() => {
     const i0 = Math.floor(lx / CH), i1 = Math.floor((lx + viewW) / CH);
     for (let i = i0; i <= i1; i++) {
       const cv = chunk(layer, i, RS);
-      ctx.drawImage(cv, Math.floor((i * CH - lx) * S), dy, Math.ceil(CH * S) + 1, Math.ceil(H * S));
+      ctx.drawImage(cv, Math.floor((i * CH - lx) * S), dy + Math.round((layer.top || 0) * S), Math.ceil(CH * S) + 1, Math.ceil((H - (layer.top || 0)) * S));
     }
     // keep just a chunk either side: prewarm paints one ahead, and phones are short on canvas memory
     for (const k of layer.cache.keys()) if (k < i0 - 1 || k > i1 + 1) layer.cache.delete(k);
@@ -748,5 +750,19 @@ const World = (() => {
 
   function reset() { for (const l of layers) l.cache.clear(); }
 
-  return { H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, PUDDLES, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR };
+  // ---------------------------------------------------------------- hooks for other areas (the fair)
+  function addObject(id, x0, x1, fn) { add(L[id], x0, x1, fn); }
+  function addLamp(x) {
+    add(L.ground, x - 20, x + 20, (c, r) => lampPost(c, r, x, groundY(x) + 6));
+    LIGHTS.push({ x, y: groundY(x) - 158, r: 230, col: [255, 170, 90], flick: 1, pool: true, cone: true });
+    LAMPS.push(x);
+  }
+  const ground = { far: hillF, back: hillB, mid: hillM, near: hillN };
+  // the layer x that sits behind playfield x when the camera is centred there
+  const atDepth = (x, f) => (x - 600) * f + 600;
+
+  return {
+    H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, PUDDLES, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR,
+    addObject, addLamp, ground, atDepth, RIM,
+  };
 })();
