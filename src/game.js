@@ -186,11 +186,25 @@
     buster: false, charging: false, charge: 0,
     flash: 0, strikeT: 99, nextStrike: 22,
     maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null, wheelA: 0,
+    // the carousel, the house and the Hollow Reach
+    carA: 0, carSpeed: 0.12, carRide: null, ring: null, rings: 0,
+    inside: false, room: '', studyOpen: false, icheck: null, xf: null, relics: new Set(), cookMet: false, musicbox: false,
+    barTried: new Set(), patchMet: false, apples: new Set(), orchardKey: false, mirrors: new Set(), mirrorsDone: false, robert: false, bell: false,
+    lamps: new Set(), will: false,
+    chips: 0, casinoOpen: false, wobble: 0,
   };
   const player = { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1, sw: 0, swv: 0, lantern: [0, 0] };
   const CLUES = Object.keys(STORY).filter(k => STORY[k].clue);
   const ECHOES = Object.keys(STORY).filter(k => STORY[k].echo);
   const BONES_X = 2290;
+  // relics are the small finds in the house and the Hollow Reach that fill the journal's third page
+  const EXTRA_RELICS = ['m_desk', 'm_strongroom', 'm_cook', 'm_musicbox', 'mirrors', 'boathouse'];
+  const RELICS = Object.keys(STORY).filter(k => STORY[k].relic || EXTRA_RELICS.includes(k));
+  // every gas lamp doubles as a waymarker for lamplight travel
+  const lampSpots = World.LAMPS.map(x => ({ id: 'lamp', x, y: 430, lamp: true }));
+  const spotsNow = () => (state.inside ? Mansion.SPOTS : World.SPOTS.concat(lampSpots));
+  const groundNow = x => (state.inside ? Mansion.FLOOR : World.groundY(x));
+  const platsNow = () => (state.inside ? Mansion.PLATFORMS : World.PLATFORMS);
 
   // Blue Bones' Energy Cells: one needs the headstone, one the fountain bowls, one is guarded by shades
   const CELLS = [
@@ -199,13 +213,19 @@
     { id: 'c3', x: 3700, y: 552 },
   ];
   // shades patrol these stretches of path: [from, to, count]
-  const SHADE_ZONES = [[1380, 1620, 1], [3420, 3800, 2], [4060, 4420, 2]];
+  const SHADE_ZONES = [[1380, 1620, 1], [3420, 3800, 2], [4060, 4420, 2], ...Beyond.SHADE_ZONES];
   let shades = [];
   function spawnShades() {
     shades = [];
     for (const [a, b, n] of SHADE_ZONES) {
       for (let i = 0; i < n; i++) {
-        shades.push({ x: a + ((b - a) * (i + 0.5)) / n, y: 0, a, b, dir: i % 2 ? -1 : 1, hp: 3, flash: 0, ph: i * 2.1 + a, alive: true });
+        shades.push({ x: a + ((b - a) * (i + 0.5)) / n, y: 0, a, b, dir: i % 2 ? -1 : 1, hp: 3, flash: 0, ph: i * 2.1 + a, alive: true, ins: false });
+      }
+    }
+    // spirits that never left the house
+    for (const [a, b, fy, n] of Mansion.SHADE_ZONES) {
+      for (let i = 0; i < n; i++) {
+        shades.push({ x: a + ((b - a) * (i + 0.5)) / n, y: 0, a, b, fy, dir: i % 2 ? -1 : 1, hp: 3, flash: 0, ph: i * 2.1 + a, alive: true, ins: true });
       }
     }
   }
@@ -308,7 +328,7 @@
       const MEL = [587, 440, 349, 587, 440, 349, 554, 440, 330, 554, 440, 330, 523, 440, 349, 466, 392, 294, 440, 349, 294, 440, 330, 277];
       const BASS = [147, 147, 110, 110, 131, 117, 147, 110];
       while (cal.next < ac.currentTime + 0.4) {
-        const t = cal.next, i = cal.i % MEL.length, beat = 0.34;
+        const t = cal.next, i = cal.i % MEL.length, beat = 0.34 / (this.calSpeed || 1);
         const note = (f, len, vol, type) => {
           const o = ac.createOscillator(), e = ac.createGain();
           o.type = type; o.frequency.value = f * (1 + Math.sin(t * 5) * 0.006); // a tired, wobbling reed
@@ -402,6 +422,12 @@
     const q = state.quest, n = q.cells.size;
     $('cells').hidden = !q.met;
     $('cells').textContent = q.done ? 'Bone Buster' : `Energy Cells ${n} / 3`;
+    const ex = [];
+    if (state.apples.size && !state.orchardKey) ex.push(`Moon Apples ${state.apples.size} / 6`);
+    if (state.rings && !state.musicbox) ex.push(`Brass rings ${state.rings} / 3`);
+    if (state.casinoOpen) ex.push(`Ghost chips ${state.chips}`);
+    $('extras').hidden = !ex.length;
+    $('extras').textContent = ex.join(' · ');
     $('t-fire').hidden = !state.buster;
     const list = $('journal-list');
     list.innerHTML = '';
@@ -419,6 +445,28 @@
       else { li.className = 'unknown'; li.innerHTML = '<b>Unheard</b><span>A pale voice is waiting somewhere.</span>'; }
       echoes.appendChild(li);
     }
+    const rl = $('relic-list');
+    rl.innerHTML = '';
+    let found = 0;
+    for (const id of RELICS) {
+      if (!state.relics.has(id)) continue;
+      found++;
+      const li = document.createElement('li');
+      li.innerHTML = `<b>${STORY[id].title}</b><span>${STORY[id].note}</span>`;
+      rl.appendChild(li);
+    }
+    $('relic-count').textContent = found
+      ? `${found} of ${RELICS.length} found. The rest wait in the house and past the fair.`
+      : 'Vanehold itself is open to you now, and the country beyond the fair. Look for small things.';
+    $('side2').textContent = state.orchardKey
+      ? 'Old Patch has his Moon Apples back and has given you the boathouse key.'
+      : state.patchMet
+        ? `Old Patch wants his six Moon Apples back: the orchard's trees, wagon, well and cider press. ${state.apples.size} of 6 found.`
+        : state.apples.size ? `You have found ${state.apples.size} silver apple${state.apples.size > 1 ? 's' : ''}. Someone in the orchard must be missing them.` : 'A scarecrow stands in the orchard past the Hollow Gate.';
+    $('side3').textContent = state.musicbox
+      ? 'You woke the attic music box with three brass rings.'
+      : state.rings >= 3 ? 'You carry three brass rings. The music in the attic is waiting for them.'
+        : `Ride the carousel at the fair and reach for the brass ring. ${state.rings} of 3 found. A music box in the house wants them.`;
     $('side').textContent = q.done
       ? 'Blue Bones is back at full power. You carry his Bone Buster: F to fire, hold F to charge.'
       : q.met
@@ -431,6 +479,7 @@
     const open = force ?? !$('journal').classList.contains('show');
     if (state.mode !== (open ? 'play' : 'journal')) return; // only opens from play, only closes itself
     $('journal').classList.toggle('show', open);
+    document.body.classList.toggle('overlay-open', open); // the touch pad must not cover the Close button
     state.mode = open ? 'journal' : 'play';
   }
 
@@ -520,27 +569,292 @@
     }
   }
 
+  function addRelic(id) {
+    if (state.relics.has(id)) return false;
+    state.relics.add(id); Audio.chime(540); updateHud(); toast(`Relic found: ${STORY[id].title}`);
+    return true;
+  }
+
+  // ---- screen fades between the grounds and the house
+  function transition(fn) {
+    if (state.xf) return;
+    state.xf = { t: 0, fn, done: false };
+    state.mode = 'trans';
+    state.charging = false;
+  }
+  function snapCam() {
+    const maxCam = state.inside ? Math.max(0, Mansion.W - viewW) : World.WORLD_W + 300 - viewW;
+    state.cam = clamp(player.x - viewW * 0.42, 0, maxCam); state.camY = 0;
+  }
+  function enterHouse() {
+    transition(() => {
+      Mansion.ensure();
+      state.inside = true; state.room = ''; shots.length = 0;
+      state.icheck = { x: 440, y: Mansion.FLOOR };
+      Object.assign(player, { x: 230, y: Mansion.FLOOR, vx: 0, vy: 0, ground: true, face: 1 });
+      snapCam(); Audio.chime(330);
+    });
+  }
+  function leaveHouse(toX = World.DOOR) {
+    transition(() => {
+      state.inside = false; state.room = ''; shots.length = 0;
+      Object.assign(player, { x: toX, y: World.groundY(toX), vx: 0, vy: 0, ground: true, face: 1 });
+      snapCam(); toast('The night air, and the lamps');
+    });
+  }
+  // the grand stair is a fade between storeys, so the hall can still be crossed on the ground floor
+  function climbStairs(up) {
+    transition(() => {
+      Object.assign(player, { x: up ? Mansion.UP_X0 + 80 : Mansion.UP_X0 - 150, y: up ? Mansion.UP : Mansion.FLOOR, vx: 0, vy: 0, ground: true, face: up ? 1 : -1 });
+      state.room = ''; snapCam();
+    });
+  }
+  function travelTo(x) {
+    transition(() => {
+      Object.assign(player, { x, y: World.groundY(x), vx: 0, vy: 0, ground: true });
+      state.checkpoint = x; snapCam(); Audio.chime(700);
+      toast(Beyond.LAMP_NAMES[x] || 'Lamplight');
+    });
+  }
+
+  // ---- lamplight travel
+  function lampTravel(spot) {
+    const stops = [...state.lamps].filter(x => Math.abs(x - spot.x) > 5).sort((a, b) => a - b);
+    if (!stops.length) return openDialog('Lamplight', ['The flame leans toward you and finds no other lit lamp to lean toward. Walk on, and light more.']);
+    const pick = list => openDialog('Lamplight', [LAMPLIGHT.intro], null, [
+      ...list.map(x => ({ label: Beyond.LAMP_NAMES[x] || 'A far lamp', fn: () => travelTo(x) })),
+      { label: LAMPLIGHT.back, fn: () => {} },
+    ]);
+    if (stops.length <= 6) return pick(stops);
+    const regs = LAMPLIGHT.regions.filter(r => stops.some(x => x >= r.from && x < r.to));
+    openDialog('Lamplight', [LAMPLIGHT.intro], null, [
+      ...regs.map(r => ({ label: r.label, fn: () => pick(stops.filter(x => x >= r.from && x < r.to)) })),
+      { label: LAMPLIGHT.back, fn: () => {} },
+    ]);
+  }
+
+  // ---- the carousel
+  function carView() { return fairView(); }
+  function mountCarousel() {
+    if (state.carRide || state.mode !== 'play') return;
+    const idx = Carnival.frontHorse(carView());
+    state.carRide = { idx, lap: null, t: 0 };
+    state.ring = null;
+    Audio.chime(520);
+    toast('Space: reach for the ring · ← → speed · E: climb down');
+  }
+  function dismount() {
+    state.carRide = null; state.ring = null;
+    Object.assign(player, { x: Carnival.CAROUSEL_X - 40, y: World.groundY(Carnival.CAROUSEL_X), vx: 0, vy: 0, ground: true, face: -1 });
+    state.cam = clamp(player.x - viewW * 0.42, 0, World.WORLD_W + 300 - viewW);
+  }
+  const ringAngle = () => {
+    const raw = state.carA + (state.carRide.idx / 8) * P.TAU;
+    return [raw, mod(raw + Math.PI, P.TAU) - Math.PI];
+  };
+  function updateCarRide() {
+    const cr = state.carRide;
+    if (!cr) return;
+    const [raw, a] = ringAngle();
+    const lap = Math.floor((raw + 1.25) / P.TAU);
+    if (cr.lap === null) cr.lap = lap;
+    else if (lap !== cr.lap) {
+      cr.lap = lap;
+      state.ring = { brass: state.rings < 3 && Math.random() < 0.5, taken: false };
+    }
+    if (state.ring && a > 0.65) state.ring = null; // swept past
+  }
+  function grabRing() {
+    const r = state.ring;
+    if (!r || r.taken) return Audio.blip('sine', 300, 220, 0.1, 0.03);
+    const [, a] = ringAngle();
+    if (Math.abs(a) > 0.6) return Audio.blip('sine', 300, 220, 0.1, 0.03);
+    r.taken = true;
+    if (r.brass) {
+      state.rings++; Audio.chime(1100); updateHud();
+      toast(`Brass ring ${state.rings} / 3`);
+      if (state.rings === 3) openDialog('The Brass Rings', ['Three brass rings, warm as embers. A boy named A.C. once won one of these and a boy named T.J. cheated for the other.', 'Somewhere in the house, something is waiting for them.']);
+    } else { Audio.booth('clink'); toast('Only a tin ring. Reach again next time round'); }
+  }
+  // the ghost, drawn mid-carousel so that it passes behind the centre column
+  function drawRider(h) {
+    player.x = h.x + state.cam; player.y = h.y + 12 - state.camY; player.face = h.dir; player.vx = 0; player.ground = false;
+    drawGhost();
+  }
+
+  // ---- the Dead Man's Hand
+  function talkBouncer() {
+    const B = BOUNCER;
+    if (state.casinoOpen) return openDialog(B.name, [B.after[Math.floor(Math.random() * B.after.length)]]);
+    const pass = a => {
+      state.casinoOpen = true; state.chips = 100; Audio.chime(660); updateHud();
+      openDialog(B.name, [...a.reply, B.welcome], () => toast('Ghost chips: 100'));
+    };
+    openDialog(B.name, B.ask, null, B.answers.map(a => ({
+      label: a.label,
+      fn: () => {
+        if (a.ok === true || (a.ok === 'ticket' && state.ticket)) pass(a);
+        else openDialog(B.name, a.fail || a.reply);
+      },
+    })));
+  }
+  function enterCasino() {
+    if (!state.casinoOpen) return openDialog(BOUNCER.name, [BOUNCER.shut]);
+    state.mode = 'casino'; state.charging = false;
+    document.body.classList.add('mini-open');
+    Casino.start({
+      chips: state.chips,
+      tried: state.barTried,
+      sfx: name => Audio.booth(name),
+      onChips: n => { state.chips = n; updateHud(); },
+      onOrder: (id, tried) => {
+        state.barTried = new Set(tried);
+        if (id === 'pho') { state.lantern = state.maxLantern; toast('Your lantern burns full'); }
+        else if (id === 'cheese') { state.lantern = Math.min(state.maxLantern, state.lantern + 1); toast('A flame returns'); }
+        else if (id === 'gin') state.wobble = 30;
+        else if (id === 'water') state.wobble = 0;
+        updateHud();
+        if (tried.size >= 6) addRelic('casino_regular');
+      },
+      onClose: chips => {
+        state.chips = chips; state.mode = 'play';
+        document.body.classList.remove('mini-open');
+        if (chips >= 300) addRelic('casino_roller');
+        updateHud();
+      },
+    });
+  }
+
+  // ---- the Hall of Mirrors
+  function enterMirrors() {
+    const T = 'The Hall of Mirrors';
+    const menu = () => openDialog(T, [MIRRORS.menu], null, [
+      ...Object.entries(MIRRORS.views).map(([k, v]) => ({ label: v.label + (state.mirrors.has(k) ? ' ✓' : ''), fn: () => look(k) })),
+      { label: MIRRORS.leave, fn: () => {} },
+    ]);
+    const look = k => {
+      state.mirrors.add(k); Audio.chime(500);
+      openDialog(T, MIRRORS.views[k].text, () => {
+        if (state.mirrors.size >= 3 && !state.mirrorsDone) {
+          state.mirrorsDone = true; Audio.chime(880);
+          openDialog(T, MIRRORS.done, () => { addRelic('mirrors'); });
+        } else menu();
+      });
+    };
+    if (state.mirrorsDone) return openDialog(T, ['The mirrors show only your own face now, tired and kind. They do not need to show you anything else.']);
+    openDialog(T, state.mirrors.size ? [MIRRORS.menu] : MIRRORS.intro, null, [
+      ...Object.entries(MIRRORS.views).map(([k, v]) => ({ label: v.label + (state.mirrors.has(k) ? ' ✓' : ''), fn: () => look(k) })),
+      { label: MIRRORS.leave, fn: () => {} },
+    ]);
+  }
+
+  // ---- the orchard, the boathouse and the bell
+  function talkPatch() {
+    const n = state.apples.size;
+    if (!state.patchMet) {
+      state.patchMet = true;
+      const pages = n >= 6 ? [...PATCH.meet.slice(0, 2), ...PATCH.done] : PATCH.meet;
+      if (n >= 6) state.orchardKey = true;
+      openDialog(PATCH.name, pages, () => { updateHud(); toast(n >= 6 ? 'Boathouse key' : 'Side quest: the Moon Apples'); });
+    } else if (n >= 6 && !state.orchardKey) {
+      state.orchardKey = true; Audio.chime(880);
+      openDialog(PATCH.name, PATCH.done, () => { updateHud(); toast('Boathouse key'); });
+    } else if (state.orchardKey) openDialog(PATCH.name, [PATCH.after]);
+    else openDialog(PATCH.name, [PATCH.waiting(n)]);
+    dlg.speaker = 'patch';
+  }
+  function enterBoathouse() {
+    const T = STORY.boathouse.title;
+    if (!state.orchardKey) return openDialog(T, HALE.locked);
+    if (state.robert) return openDialog(T, [HALE.again]);
+    state.robert = true; Audio.chime(440);
+    openDialog(T, HALE.scene, () => { addRelic('boathouse'); });
+  }
+  function ringBell() {
+    Audio.chime(196); setTimeout(() => Audio.chime(294), 300);
+    const first = !state.bell; state.bell = true;
+    state.strikeT = 0; // the lightning flash doubles as the bell's shimmer
+    openDialog(STORY.bell.title, first ? BELL.toll : [BELL.again]);
+  }
+
+  // ---- the house
+  function houseExamine(spot) {
+    const id = spot.id, s = STORY[id];
+    if (id === 'm_exit') return leaveHouse();
+    if (id === 'm_back') return leaveHouse(5190);
+    if (id === 'm_stairs_up' || id === 'm_stairs_down') return climbStairs(id === 'm_stairs_up');
+    if (id === 'm_atlas') {
+      if (state.studyOpen) return openDialog(s.title, [s.again]);
+      state.studyOpen = true; Audio.chime(300);
+      return openDialog(s.title, s.text, () => toast('The study door is open'));
+    }
+    if (id === 'm_desk' || id === 'm_strongroom') {
+      if (!state.found.has('keys')) return openDialog(s.title, [s.locked]);
+      addRelic(id);
+      if (id === 'm_strongroom') state.will = true;
+      const full = state.found.size >= CLUES.length && id === 'm_desk';
+      return openDialog(s.title, s.text, null, full ? [
+        ...SUSPECTS.map(su => ({ label: `Name ${su.name}`, fn: () => accuse(su.id) })),
+        { label: 'Not yet. I need to think.', fn: () => {} },
+      ] : null);
+    }
+    if (id === 'm_cook') {
+      const pages = state.cookMet ? [s.again[Math.floor(Math.random() * s.again.length)]] : s.meet;
+      state.cookMet = true;
+      state.lantern = state.maxLantern; Audio.chime(660); updateHud();
+      return openDialog(s.title, pages, () => { addRelic('m_cook'); toast('Your lantern rekindles'); });
+    }
+    if (id === 'm_musicbox') {
+      if (state.musicbox) return openDialog(s.title, [s.again]);
+      if (state.rings < 3) return openDialog(s.title, s.locked(state.rings));
+      state.musicbox = true; state.maxLantern += 1; state.lantern = state.maxLantern;
+      Audio.chime(880); updateHud();
+      return openDialog(s.title, s.text, () => { addRelic('m_musicbox'); toast('Your lantern holds another flame'); });
+    }
+    // everything else is a plain look: an echo, or a relic
+    const first = !state.seen.has(id);
+    state.seen.add(id);
+    if (s.echo && first) { state.echoes.add(id); Audio.chime(392); updateHud(); toast(`Echo heard: ${s.title}`); }
+    if (s.relic && first) addRelic(id);
+    openDialog(s.title, s.text);
+  }
+
+  function askKiller() {
+    openDialog(STORY.door.title, [STORY.door.ask], null, [
+      ...SUSPECTS.map(su => ({ label: su.name, fn: () => accuse(su.id) })),
+      { label: 'Not yet. I need to think.', fn: () => {} },
+    ]);
+  }
+
   function examine(spot) {
     if (spot.id === 'bones') return talkBones();
     if (spot.id === 'barker') return talkBarker();
+    if (spot.id === 'lamp') return lampTravel(spot);
+    if (spot.id === 'carousel') return mountCarousel();
+    if (spot.id === 'mirrors') return enterMirrors();
+    if (spot.id === 'bouncer') return talkBouncer();
+    if (spot.id === 'casino') return enterCasino();
+    if (spot.id === 'patch') return talkPatch();
+    if (spot.id === 'boathouse') return enterBoathouse();
+    if (spot.id === 'bell') return ringBell();
+    if (spot.id.startsWith('m_') || spot.id === 'echo_toast' || spot.id === 'echo_father') return houseExamine(spot);
     if (Minigames.has(spot.id)) return playBooth(spot.id);
     if (spot.id === 'wheel') return state.ticket ? boardWheel() : openDialog('The Wheel', [FAIR.wheelClosed]);
     const s = STORY[spot.id];
     if (spot.id === 'door') {
-      if (state.found.size < CLUES.length) {
-        openDialog(s.title, [`${s.locked} (${state.found.size} of ${CLUES.length} clues found)`]);
-      } else {
-        openDialog(s.title, [s.ask], null, [
-          ...SUSPECTS.map(su => ({ label: su.name, fn: () => accuse(su.id) })),
-          { label: 'Not yet. I need to think.', fn: () => {} },
-        ]);
-      }
+      const full = state.found.size >= CLUES.length;
+      openDialog(s.title, [full ? s.ask : s.open(state.found.size, CLUES.length)], null, [
+        { label: 'Enter the house', fn: enterHouse },
+        ...(full ? [{ label: 'Name the killer', fn: askKiller }] : []),
+        { label: 'Not yet.', fn: () => {} },
+      ]);
       return;
     }
     const first = !state.seen.has(spot.id);
     state.seen.add(spot.id);
     if (s.echo && first) { state.echoes.add(spot.id); Audio.chime(392); updateHud(); toast(`Echo heard: ${s.title}`); }
     if (s.clue && first) { state.found.add(spot.id); Audio.chime(spot.id === 'keys' ? 520 : 660); updateHud(); toast(`Clue found: ${s.title}`); }
+    if (s.relic && first) addRelic(spot.id);
     openDialog(s.title, s.text);
   }
 
@@ -553,9 +867,17 @@
     updateHud();
   }
 
+  function collectApple(a) {
+    state.apples.add(a.id);
+    Audio.chime(880); burst(a.x, a.y, 14);
+    if (state.lantern < state.maxLantern) state.lantern++;
+    updateHud();
+    toast(PATCH.apple(state.apples.size));
+  }
+
   function accuse(id) {
     if (id !== CULPRIT) return openDialog('Silence', [ENDINGS.wrong]);
-    const knows = state.echoes.has('echo_steward') || state.echoes.has('echo_heir');
+    const knows = state.echoes.has('echo_steward') || state.echoes.has('echo_heir') || state.echoes.has('echo_toast') || state.relics.has('m_desk');
     openDialog('Halloway', ENDINGS.confront(knows), null, [
       { label: 'Let the law take him.', fn: () => ending('justice') },
       { label: 'Show him mercy.', fn: () => ending('mercy') },
@@ -569,15 +891,25 @@
     if (state.echoes.size === ECHOES.length) pages.push(ENDINGS.understood);
     if (state.quest.done) pages.push(BONES.ending);
     if (state.rode) pages.push(FAIR.ending);
+    if (state.musicbox) pages.push(HOUSE_ENDINGS.musicbox);
+    if (state.robert) pages.push(HOUSE_ENDINGS.robert);
+    if (state.mirrorsDone) pages.push(MIRRORS.ending);
+    if (kind === 'mercy' && state.echoes.has('chapel')) pages.push(HOUSE_ENDINGS.father);
+    if (state.bell) pages.push(BELL.ending);
+    if (state.casinoOpen) pages.push(BOUNCER.ending);
+    if (state.relics.has('casino_roller')) pages.push(HOUSE_ENDINGS.casino);
     $('ending-title').textContent = e.title;
     $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
     $('ending').classList.add('show');
+    document.body.classList.add('overlay-open');
   }
 
   function nearestSpot() {
+    if (state.carRide) return null;
     let best = null, bd = 90;
-    for (const s of World.SPOTS) {
-      const d = Math.abs(s.x - player.x);
+    for (const s of spotsNow()) {
+      if (state.inside && (s.y < 300) !== (player.y < 400)) continue; // a spot on the other storey
+      const d = Math.abs(s.x - player.x) + (s.lamp ? 35 : 0);
       if (d < bd) { bd = d; best = s; }
     }
     return best;
@@ -586,11 +918,13 @@
   function interact() {
     if (state.mode === 'dialog') return advance();
     if (state.mode !== 'play' || state.respawning || state.ride) return;
+    if (state.carRide) return dismount();
     const s = nearestSpot();
     if (s) examine(s);
   }
 
   function jump() {
+    if (state.carRide) { if (state.mode === 'play') grabRing(); return; }
     if (state.mode !== 'play' || state.respawning || state.lock > 0 || !player.ground) return;
     player.vy = -520; player.ground = false;
     Audio.jump();
@@ -637,12 +971,20 @@
   function restart() {
     state.found.clear(); state.seen.clear(); state.echoes.clear();
     state.quest = { met: false, cells: new Set(), done: false };
-    Object.assign(state, { maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null });
+    Object.assign(state, {
+      maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null,
+      carA: 0, carSpeed: 0.12, carRide: null, ring: null, rings: 0, inside: false, room: '', studyOpen: false, icheck: null, xf: null,
+      relics: new Set(), cookMet: false, musicbox: false, patchMet: false, apples: new Set(), orchardKey: false, mirrors: new Set(),
+      mirrorsDone: false, robert: false, bell: false, lamps: new Set(), will: false, chips: 0, casinoOpen: false, wobble: 0, barTried: new Set(),
+    });
+    document.body.classList.remove('tipsy');
     state.buster = false; state.lantern = 3; state.checkpoint = 200; state.inv = 0; state.fade = 0; state.respawning = false;
     Object.assign(player, { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1 });
     spawnShades(); shots.length = 0;
     $('ending').classList.remove('show');
+    document.body.classList.remove('overlay-open');
     updateHud();
+    snapCam();
     state.mode = 'play';
     state.seen.add('grave');
   }
@@ -650,6 +992,7 @@
   // ---------------------------------------------------------------- input
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
+    if (state.mode === 'casino') { if (k === 'escape') Casino.close(); return; } // the casino is clicked and tapped; keys keep their normal job
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'enter', 'tab'].includes(k)) e.preventDefault();
     if (state.mode === 'title') { if (k === 'enter' || k === ' ') begin(); return; }
     if (state.mode === 'mini') { Minigames.key(e, true); return; }
@@ -709,8 +1052,8 @@
 
   // ---------------------------------------------------------------- simulation
   function surfaceBelow(x, y) {
-    let s = World.groundY(x);
-    for (const p of World.PLATFORMS) if (x >= p.x0 && x <= p.x1 && p.y >= y - 1 && p.y < s) s = p.y;
+    let s = groundNow(x);
+    for (const p of platsNow()) if (x >= p.x0 && x <= p.x1 && p.y >= y - 1 && p.y < s) s = p.y;
     return s;
   }
 
@@ -723,7 +1066,7 @@
   }
 
   function updatePlayer(dt) {
-    if (state.ride) return;
+    if (state.ride || state.carRide) return;
     const k = state.keys;
     state.inv = Math.max(0, state.inv - dt); state.lock = Math.max(0, state.lock - dt);
     let dir = 0;
@@ -733,7 +1076,10 @@
     }
     const prevV = player.vx;
     if (state.lock <= 0) player.vx += (dir * 240 - player.vx) * Math.min(1, dt * (dir ? 6 : 11));
-    player.x = clamp(player.x + player.vx * dt, 110, World.WORLD_W - 60);
+    const minX = state.inside ? 70 : 110, maxX = (state.inside ? Mansion.W : World.WORLD_W) - 60;
+    player.x = clamp(player.x + player.vx * dt, minX, maxX);
+    // the study door stays shut on the ground floor until the atlas has been turned
+    if (state.inside && !state.studyOpen && player.y > Mansion.UP + 60 && player.x > Mansion.STUDY_DOOR - 40) { player.x = Mansion.STUDY_DOOR - 40; player.vx = 0; }
     if (dir) player.face = dir;
 
     // gravity, with a slow ghostly glide while jump is held
@@ -743,9 +1089,9 @@
     const ny = player.y + player.vy * dt;
     let land = null;
     if (player.vy >= 0) {
-      const g = World.groundY(player.x);
+      const g = groundNow(player.x);
       if (ny >= g) land = g;
-      for (const p of World.PLATFORMS) {
+      for (const p of platsNow()) {
         if (player.x >= p.x0 && player.x <= p.x1 && player.y <= p.y + 0.5 && ny >= p.y && (land === null || p.y < land)) land = p.y;
       }
     }
@@ -759,28 +1105,43 @@
 
     if (state.charging) state.charge += dt;
 
-    // gas lamps are checkpoints and rekindle the lantern
-    for (const lx of World.LAMPS) {
-      if (Math.abs(player.x - lx) < 40 && !state.respawning && (state.checkpoint !== lx || state.lantern < state.maxLantern)) {
-        if (state.lantern < state.maxLantern) { toast('Your lantern rekindles'); Audio.chime(780); }
-        state.checkpoint = lx; state.lantern = state.maxLantern; updateHud();
+    // gas lamps are checkpoints and rekindle the lantern; fireplaces do the same indoors
+    if (state.inside) {
+      for (const h of Mansion.HEARTHS) {
+        if (Math.abs(player.x - h.x) < 70 && Math.abs(player.y - h.y) < 40 && !state.respawning && (!state.icheck || state.icheck.x !== h.x || state.lantern < state.maxLantern)) {
+          if (state.lantern < state.maxLantern) { toast('The hearth rekindles your lantern'); Audio.chime(780); }
+          state.icheck = { x: h.x, y: h.y }; state.lantern = state.maxLantern; updateHud();
+        }
       }
-    }
-
-    for (const c of CELLS) {
-      if (state.quest.cells.has(c.id)) continue;
-      if (Math.abs(player.x - c.x) < 40 && c.y > player.y - 150 && c.y < player.y + 14) collectCell(c);
+    } else {
+      for (const lx of World.LAMPS) {
+        if (Math.abs(player.x - lx) < 40 && !state.respawning && (state.checkpoint !== lx || state.lantern < state.maxLantern || !state.lamps.has(lx))) {
+          if (state.lantern < state.maxLantern) { toast('Your lantern rekindles'); Audio.chime(780); }
+          else if (!state.lamps.has(lx) && Beyond.LAMP_NAMES[lx]) toast(`Lamp lit: ${Beyond.LAMP_NAMES[lx]}`);
+          state.lamps.add(lx);
+          state.checkpoint = lx; state.lantern = state.maxLantern; updateHud();
+        }
+      }
+      for (const c of CELLS) {
+        if (state.quest.cells.has(c.id)) continue;
+        if (Math.abs(player.x - c.x) < 40 && c.y > player.y - 150 && c.y < player.y + 14) collectCell(c);
+      }
+      for (const a of Beyond.APPLES) {
+        if (state.apples.has(a.id)) continue;
+        if (Math.abs(player.x - a.x) < 40 && a.y > player.y - 150 && a.y < player.y + 14) collectApple(a);
+      }
     }
 
     if (state.respawning) {
       state.fade = Math.min(1, state.fade + dt * 1.2);
       if (state.fade >= 1) {
-        Object.assign(player, { x: state.checkpoint, y: World.groundY(state.checkpoint), vx: 0, vy: 0, ground: true });
-        state.cam = clamp(player.x - viewW * 0.42, 0, World.WORLD_W + 300 - viewW);
+        const cp = state.inside ? (state.icheck || { x: 440, y: Mansion.FLOOR }) : { x: state.checkpoint, y: World.groundY(state.checkpoint) };
+        Object.assign(player, { x: cp.x, y: cp.y, vx: 0, vy: 0, ground: true });
+        snapCam();
         state.lantern = state.maxLantern; state.respawning = false; state.inv = 1.5;
         // shades near the lamp drift back to the far end of their patrol
         for (const sh of shades) {
-          if (sh.alive && Math.abs(sh.x - player.x) < 300) sh.x = Math.abs(sh.a - player.x) > Math.abs(sh.b - player.x) ? sh.a : sh.b;
+          if (sh.alive && sh.ins === state.inside && Math.abs(sh.x - player.x) < 300) sh.x = Math.abs(sh.a - player.x) > Math.abs(sh.b - player.x) ? sh.a : sh.b;
         }
         updateHud();
       }
@@ -789,13 +1150,13 @@
 
   function updateShades(dt) {
     for (const s of shades) {
-      if (!s.alive) continue;
+      if (!s.alive || s.ins !== state.inside) continue;
       s.flash = Math.max(0, s.flash - dt);
       const hunting = Math.abs(player.x - s.x) < 240 && player.x > s.a - 80 && player.x < s.b + 80 && !state.respawning;
       s.x += (hunting ? Math.sign(player.x - s.x) * 72 : s.dir * 50) * dt;
       if (s.x < s.a) { s.x = s.a; s.dir = 1; }
       if (s.x > s.b) { s.x = s.b; s.dir = -1; }
-      s.y = World.groundY(s.x) - 50 + Math.sin(state.t * 2 + s.ph) * 7;
+      s.y = (s.fy ?? World.groundY(s.x)) - 50 + Math.sin(state.t * 2 + s.ph) * 7;
       if (Math.abs(player.x - s.x) < 36 && s.y + 24 > player.y - 135 && s.y - 22 < player.y) hurt(s.x);
     }
     for (let i = shots.length - 1; i >= 0; i--) {
@@ -803,7 +1164,7 @@
       b.x += b.vx * dt; b.life -= dt;
       let spent = false;
       for (const s of shades) {
-        if (!s.alive || b.hits.has(s) || Math.abs(b.x - s.x) > (b.big ? 42 : 30) || Math.abs(b.y - s.y) > (b.big ? 56 : 40)) continue;
+        if (!s.alive || s.ins !== state.inside || b.hits.has(s) || Math.abs(b.x - s.x) > (b.big ? 42 : 30) || Math.abs(b.y - s.y) > (b.big ? 56 : 40)) continue;
         b.hits.add(s);
         s.hp -= b.big ? 3 : 1; s.flash = 0.15; Audio.thud();
         if (s.hp <= 0) { s.alive = false; burst(s.x, s.y, 22); }
@@ -829,13 +1190,35 @@
     updateStorm(dt);
     state.wheelA += dt * (state.ride ? 0.45 : state.ticket ? 0.12 : 0.035);
     updateRide();
-    Audio.calliope(state.mode === 'title' ? 0 : clamp((player.x - 5150) / 350, 0, 1));
+    // the carousel turns slowly when empty, and faster with a rider; arrows set the pace
+    const cdir = (state.keys.arrowright || state.keys.d || state.touch.r ? 1 : 0) - (state.keys.arrowleft || state.keys.a || state.touch.l ? 1 : 0);
+    const carTarget = state.carRide ? 0.95 + cdir * 0.5 : state.ticket ? 0.45 : 0.12;
+    state.carSpeed += (carTarget - state.carSpeed) * Math.min(1, dt * 1.6);
+    state.carA += dt * state.carSpeed;
+    if (state.wobble > 0) state.wobble = Math.max(0, state.wobble - dt);
+    document.body.classList.toggle('tipsy', state.wobble > 0);
+    if (state.mode === 'play') updateCarRide();
+    const outside = !state.inside && state.mode !== 'title';
+    const fairLevel = clamp((player.x - 5150) / 350, 0, 1) * clamp((8900 - player.x) / 350, 0, 1);
+    Audio.calSpeed = state.carRide ? 1.25 : 1;
+    Audio.calliope(outside ? fairLevel : 0);
     if (state.mode === 'play') { updatePlayer(dt); updateShades(dt); }
+    if (state.xf) {
+      const x = state.xf;
+      x.t += dt * 2.2;
+      if (!x.done && x.t >= 1) { x.done = true; x.fn(); }
+      if (x.t >= 2) { state.xf = null; if (state.mode === 'trans') state.mode = 'play'; }
+    }
+    if (state.inside && state.mode === 'play') {
+      const rm = Mansion.roomAt(player.x, player.y);
+      if (rm.id !== state.room) { state.room = rm.id; toast(rm.name); }
+    }
 
-    let camTarget = clamp(player.x - viewW * 0.42 + player.face * 70, 0, World.WORLD_W + 300 - viewW);
+    let camTarget = clamp(player.x - viewW * 0.42 + player.face * 70, 0, (state.inside ? Math.max(0, Mansion.W - viewW) : World.WORLD_W + 300 - viewW));
     // the camera rises with the ghost; each layer follows by its own depth
-    const alt = Math.max(0, World.groundY(player.x) - player.y);
+    const alt = state.inside ? 0 : Math.max(0, World.groundY(player.x) - player.y);
     let camYTarget = Math.min(90, alt * 0.5);
+    if (state.carRide) camTarget = Carnival.CAROUSEL_X - viewW * 0.5;
     if (state.ride) {
       // follow the gondola up: the whole estate sinks away beneath, layer by layer
       camTarget = (World.atDepth(Carnival.WHEEL_X, 0.8) - viewW / 2) / 0.8;
@@ -1128,7 +1511,7 @@
 
   function drawShades() {
     for (const s of shades) {
-      if (!s.alive) continue;
+      if (!s.alive || s.ins !== state.inside) continue;
       const sx = toScreen(s.x, 1), sy = s.y + state.camY;
       if (sx < -80 || sx > viewW + 80) continue;
       const t = state.t + s.ph;
@@ -1184,6 +1567,26 @@
     }
   }
 
+  function drawApples() {
+    for (const a of Beyond.APPLES) {
+      if (state.apples.has(a.id)) continue;
+      const sx = toScreen(a.x, 1), sy = a.y + state.camY + Math.sin(state.t * 2.1 + a.x) * 5;
+      if (sx < -60 || sx > viewW + 60) continue;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5 + Math.sin(state.t * 3 + a.x) * 0.15;
+      ctx.drawImage(glow.cool, (sx - 38) * S, (sy - 38) * S, 76 * S, 76 * S);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.save();
+      ctx.setTransform(S, 0, 0, S, sx * S, sy * S);
+      const g = ctx.createRadialGradient(-3, -4, 1, 0, 0, 13);
+      g.addColorStop(0, '#f2f8ff'); g.addColorStop(0.55, '#a8bde0'); g.addColorStop(1, '#4b5f8f');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(-3.5, 0, 9, 0, P.TAU); ctx.arc(3.5, 0, 9, 0, P.TAU); ctx.fill();
+      ctx.strokeStyle = '#3a2c1c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -6); ctx.quadraticCurveTo(1, -12, 5, -14); ctx.stroke();
+      ctx.fillStyle = '#6a9a5a'; ctx.beginPath(); ctx.ellipse(6, -12, 5, 2.4, -0.5, 0, P.TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawShots() {
     for (const b of shots) {
       const sx = toScreen(b.x, 1), sy = b.y + state.camY;
@@ -1225,6 +1628,7 @@
     return {
       ctx, S, cam: state.cam, camY: state.camY, viewW, t: state.t, glow,
       lit: state.ticket, riding: !!state.ride, rideCar: state.ride ? state.ride.car : -1, wheelA: state.wheelA,
+      carA: state.carA, carRide: !!state.carRide, riderIdx: state.carRide ? state.carRide.idx : -1, rider: drawRider, ring: state.ring,
     };
   }
 
@@ -1305,14 +1709,34 @@
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 
+  function spotDone(s) {
+    if (Minigames.has(s.id)) return state.prizes.has(s.id);
+    switch (s.id) {
+      case 'wheel': return state.rode;
+      case 'carousel': return state.rings >= 3;
+      case 'mirrors': return state.mirrorsDone;
+      case 'patch': return state.orchardKey;
+      case 'boathouse': return state.robert;
+      case 'bell': return state.bell;
+      case 'bouncer': return state.casinoOpen;
+      case 'm_exit': case 'm_back': case 'm_stairs_up': case 'm_stairs_down': return true;
+      case 'm_atlas': return state.studyOpen;
+      case 'm_musicbox': return state.musicbox;
+      case 'm_cook': return state.cookMet;
+      case 'door': return false;
+      default: return state.seen.has(s.id) || state.relics.has(s.id);
+    }
+  }
+
   function drawSpots(near) {
     const cy = state.camY;
     ctx.globalCompositeOperation = 'lighter';
-    for (const s of World.SPOTS) {
+    for (const s of spotsNow()) {
       const sx = toScreen(s.x, 1);
-      if (sx < -100 || sx > viewW + 100 || s.id === 'bones' || s.id === 'barker') continue;
+      if (sx < -100 || sx > viewW + 100 || s.id === 'bones' || s.id === 'barker' || s.lamp) continue;
       if (s.id === 'wheel' && !state.ticket) continue;
-      const done = Minigames.has(s.id) ? state.prizes.has(s.id) : s.id === 'wheel' ? state.rode : state.seen.has(s.id) && s.id !== 'door';
+      if (state.inside && (s.y < 300) !== (player.y < 400) && s !== near) continue;
+      const done = spotDone(s);
       const pulse = 0.6 + 0.4 * Math.sin(state.t * 2.5 + s.x);
       const a = done ? 0.15 : 0.55 * pulse * (s === near ? 1.5 : 1);
       const sz = 90;
@@ -1337,7 +1761,11 @@
     const cy = state.camY;
     const sx = toScreen(near.x, 1);
     const sy = Math.min(near.y, player.y - 165) + cy - 10 + Math.sin(state.t * 3) * 3;
-    const label = near.id === 'door' ? 'Enter' : near.id === 'bones' || near.id === 'barker' ? 'Talk'
+    const label = near.lamp ? 'Lamplight' : ['door', 'mirrors', 'boathouse', 'chapel', 'casino'].includes(near.id) ? 'Enter'
+      : near.id === 'm_exit' || near.id === 'm_back' ? 'Leave'
+      : near.id === 'm_stairs_up' ? 'Climb' : near.id === 'm_stairs_down' ? 'Descend'
+      : ['bones', 'barker', 'patch', 'm_cook', 'bouncer'].includes(near.id) ? 'Talk'
+      : near.id === 'carousel' ? 'Ride' : near.id === 'bell' ? 'Ring'
       : Minigames.has(near.id) ? 'Play' : near.id === 'wheel' ? (state.ticket ? 'Ride' : 'Examine')
       : STORY[near.id]?.echo ? 'Listen' : state.seen.has(near.id) ? 'Recall' : 'Examine';
     const key = document.body.classList.contains('touch') ? '✦' : 'E';
@@ -1392,6 +1820,7 @@
     }
     for (const b of shots) hole(toScreen(b.x, 1), b.y + cy, b.big ? 160 : 90, 0.7);
     for (const c of CELLS) if (!state.quest.cells.has(c.id)) hole(toScreen(c.x, 1), c.y + cy, 110, 0.6);
+    for (const a of Beyond.APPLES) if (!state.apples.has(a.id)) hole(toScreen(a.x, 1), a.y + cy, 100, 0.6);
     const fair = Carnival.lights(fairView());
     for (const [x, y, r, a] of fair) hole(x, y, r, a);
     if (state.mode !== 'title' && !state.ride) {
@@ -1438,10 +1867,119 @@
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 
+  function finishFrame() {
+    const W = cv.width, Hh = cv.height;
+    // finishing: vignette and linen tooth
+    ctx.drawImage(vignette, 0, 0, W, Hh);
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.07;
+    ctx.fillStyle = grain; ctx.fillRect(0, 0, W, Hh);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    if (state.fade > 0) { ctx.fillStyle = `rgba(2,3,8,${state.fade})`; ctx.fillRect(0, 0, W, Hh); }
+    if (state.xf) { ctx.fillStyle = `rgba(2,3,8,${state.xf.t < 1 ? state.xf.t : Math.max(0, 2 - state.xf.t)})`; ctx.fillRect(0, 0, W, Hh); }
+  }
+
+  // ---------------------------------------------------------------- inside the house
+  function drawHearths() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const h of Mansion.HEARTHS) {
+      const sx = h.x - state.cam;
+      if (sx < -120 || sx > viewW + 120) continue;
+      for (let i = 0; i < 4; i++) {
+        const fl = 0.55 + 0.45 * Math.sin(state.t * (8 + i * 1.7) + i * 2.1 + h.x);
+        ctx.globalAlpha = 0.5 * fl;
+        const w = 46 + fl * 16;
+        ctx.drawImage(glow.warm, (sx - w / 2 + (i - 1.5) * 15) * S, (h.y - 36 - fl * 16 - w / 2) * S, w * S, w * S);
+      }
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function drawBeams() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const w of Mansion.WINDOWS) {
+      const sx = w.x - state.cam;
+      if (sx < -340 || sx > viewW + 340) continue;
+      const fy = w.fl ? Mansion.UP : Mansion.FLOOR, ty = w.y - 30;
+      const g = ctx.createLinearGradient(sx * S, ty * S, (sx - 190) * S, fy * S);
+      g.addColorStop(0, 'rgba(150,185,255,0.17)'); g.addColorStop(1, 'rgba(150,185,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo((sx - w.w / 2) * S, ty * S); ctx.lineTo((sx + w.w / 2) * S, ty * S);
+      ctx.lineTo((sx + w.w / 2 - 190) * S, fy * S); ctx.lineTo((sx - w.w / 2 - 250) * S, fy * S);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawDust() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const m of motes) {
+      const x = mod(m.u * (viewW + 300) - state.cam * 0.5 - state.t * 6 * m.sp, viewW + 300) - 150;
+      const y = 50 + m.v * 600 + Math.sin(state.t * 0.6 + m.ph) * 16;
+      ctx.globalAlpha = 0.35 * (0.5 + 0.5 * Math.sin(state.t * 1.5 + m.ph));
+      ctx.drawImage(glow.warm, (x - 3) * S, (y - 3) * S, 6 * S, 6 * S);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function drawLightingInside() {
+    const lc = lightCtx, q = 0.25;
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.globalCompositeOperation = 'source-over';
+    lc.clearRect(0, 0, lightCv.width, lightCv.height);
+    lc.fillStyle = 'rgba(3,4,12,0.64)';
+    lc.fillRect(0, 0, lightCv.width, lightCv.height);
+    lc.globalCompositeOperation = 'destination-out';
+    const hole = (x, y, r, a) => {
+      const g = lc.createRadialGradient(x * q, y * q, 0, x * q, y * q, r * q);
+      g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      lc.fillStyle = g; lc.fillRect((x - r) * q, (y - r) * q, r * 2 * q, r * 2 * q);
+    };
+    const flick = l => 0.9 + Math.sin(state.t * 13 + l.x) * 0.05 * l.flick + Math.sin(state.t * 5.1 + l.x * 0.3) * 0.05 * l.flick;
+    for (const l of Mansion.LIGHTS) {
+      const sx = l.x - state.cam;
+      if (sx < -l.r || sx > viewW + l.r) continue;
+      hole(sx, l.y, l.r * flick(l), 0.9);
+    }
+    for (const b of shots) hole(toScreen(b.x, 1), b.y, b.big ? 160 : 90, 0.7);
+    if (state.mode !== 'title') { const [lx, ly] = player.lantern; hole(toScreen(lx, 1), ly, 290 * (player.flick || 1), 1); }
+    ctx.drawImage(lightCv, 0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = 'lighter';
+    const bloom = (img, x, y, r, a) => { ctx.globalAlpha = a; ctx.drawImage(img, (x - r) * S, (y - r) * S, r * 2 * S, r * 2 * S); };
+    for (const l of Mansion.LIGHTS) {
+      const sx = l.x - state.cam;
+      if (sx < -l.r || sx > viewW + l.r) continue;
+      bloom(l.cool ? glow.cool : glow.warm, sx, l.y, l.r * 0.55 * flick(l), l.cool ? 0.18 : 0.3);
+    }
+    if (state.mode !== 'title') {
+      const [lx, ly] = player.lantern;
+      bloom(glow.warm, toScreen(lx, 1), ly, 140 * (player.flick || 1), 0.4);
+      bloom(glow.cool, toScreen(player.x, 1), player.y - 80, 110, 0.12);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function renderInside() {
+    const W = cv.width, Hh = cv.height;
+    ctx.fillStyle = '#040308'; ctx.fillRect(0, 0, W, Hh);
+    Mansion.draw(ctx, S, state.cam, viewW);
+    drawBeams();
+    drawHearths();
+    const near = state.mode === 'title' || state.mode === 'trans' ? null : nearestSpot();
+    drawSpots(near);
+    drawShades();
+    drawWisps(); drawGhost();
+    drawShots();
+    drawPrompt(near);
+    drawDust();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawLightingInside();
+    finishFrame();
+  }
+
   function render() {
     const W = cv.width, Hh = cv.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    if (state.inside) return renderInside();
     ctx.drawImage(sky.cv, 0, 0, W, Hh);
     flashOver(0.5);
 
@@ -1476,6 +2014,7 @@
     drawFlies(0.66);
     drawFog(500, 140, 0.55, 0.8, 12);
     layer(L.near);
+    Beyond.drawBack(fairView());
     Carnival.drawBack(fairView());
     drawFog(535, 120, 0.35, 0.92, 14);
     layer(L.ground);
@@ -1485,9 +2024,10 @@
     const near = state.mode === 'title' ? null : nearestSpot();
     drawSpots(near);
     drawCells();
+    drawApples();
     drawBones();
     drawShades();
-    if (state.mode !== 'title' && !state.ride) { drawWisps(); drawGhost(); }
+    if (state.mode !== 'title' && !state.ride) { drawWisps(); if (!state.carRide) drawGhost(); }
     drawShots();
     drawPrompt(near);
     drawFlies(1);
@@ -1497,14 +2037,7 @@
     drawLeaves();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawLighting();
-
-    // finishing: vignette and linen tooth
-    ctx.drawImage(vignette, 0, 0, W, Hh);
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.globalAlpha = 0.07;
-    ctx.fillStyle = grain; ctx.fillRect(0, 0, W, Hh);
-    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-    if (state.fade > 0) { ctx.fillStyle = `rgba(2,3,8,${state.fade})`; ctx.fillRect(0, 0, W, Hh); }
+    finishFrame();
   }
 
   // ---------------------------------------------------------------- loop
@@ -1530,5 +2063,5 @@
     requestAnimationFrame(t => { last = t; frame(t); });
   }, 30);
 
-  window.__deadheir = { state, player, shades, CELLS };
+  window.__deadheir = { state, player, get shades() { return shades; }, CELLS, enterHouse, leaveHouse, travelTo, mountCarousel };
 })();
