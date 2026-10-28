@@ -184,6 +184,8 @@
     lantern: 3, checkpoint: 200, inv: 0, lock: 0, fade: 0, respawning: false,
     quest: { met: false, cells: new Set(), done: false },
     buster: false, charging: false, charge: 0,
+    flash: 0, strikeT: 99, nextStrike: 22,
+    maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null, wheelA: 0,
   };
   const player = { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1, sw: 0, swv: 0, lantern: [0, 0] };
   const CLUES = Object.keys(STORY).filter(k => STORY[k].clue);
@@ -278,6 +280,59 @@
     thud() { this.blip('triangle', 180, 50, 0.16, 0.14); },
     hit() { this.blip('sawtooth', 240, 40, 0.45, 0.07); },
     jump() { this.blip('sine', 300, 520, 0.18, 0.04); },
+    thunder() {
+      if (!this.ac) return;
+      const ac = this.ac, t = ac.currentTime, len = 3.5;
+      const buf = ac.createBuffer(1, ac.sampleRate * len, ac.sampleRate), d = buf.getChannelData(0);
+      let v = 0;
+      for (let i = 0; i < d.length; i++) { v = v * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = v * 9; }
+      const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 160;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      src.connect(lp); lp.connect(g); g.connect(this.master); src.start(t);
+    },
+    // A warbling calliope waltz that swells as you near the fair.
+    calliope(level) {
+      if (!this.ac) return;
+      const ac = this.ac;
+      if (!this.cal) {
+        const g = ac.createGain(); g.gain.value = 0;
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600;
+        lp.connect(g); g.connect(this.master);
+        this.cal = { g, lp, next: ac.currentTime + 0.1, i: 0 };
+      }
+      const cal = this.cal;
+      cal.g.gain.setTargetAtTime(level * 0.05, ac.currentTime, 0.4);
+      if (level < 0.01) { cal.next = ac.currentTime + 0.1; return; }
+      const MEL = [587, 440, 349, 587, 440, 349, 554, 440, 330, 554, 440, 330, 523, 440, 349, 466, 392, 294, 440, 349, 294, 440, 330, 277];
+      const BASS = [147, 147, 110, 110, 131, 117, 147, 110];
+      while (cal.next < ac.currentTime + 0.4) {
+        const t = cal.next, i = cal.i % MEL.length, beat = 0.34;
+        const note = (f, len, vol, type) => {
+          const o = ac.createOscillator(), e = ac.createGain();
+          o.type = type; o.frequency.value = f * (1 + Math.sin(t * 5) * 0.006); // a tired, wobbling reed
+          e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(vol, t + 0.02); e.gain.exponentialRampToValueAtTime(0.001, t + len);
+          o.connect(e); e.connect(cal.lp); o.start(t); o.stop(t + len + 0.05);
+        };
+        note(MEL[i], beat * 0.9, 0.5, 'square');
+        if (i % 3 === 0) note(BASS[Math.floor(i / 3) % BASS.length], beat * 2.6, 0.6, 'triangle');
+        cal.next += beat; cal.i++;
+      }
+    },
+    booth(name) {
+      const S = {
+        splash: ['triangle', 900, 300, 0.12, 0.05], pop: ['square', 1400, 180, 0.08, 0.06], thunk: ['triangle', 260, 110, 0.08, 0.07],
+        clink: ['sine', 1800, 1500, 0.15, 0.04], clank: ['square', 420, 170, 0.14, 0.05], shot: ['square', 2200, 900, 0.03, 0.015],
+        lose: ['sawtooth', 300, 140, 0.45, 0.04],
+      };
+      if (name === 'ding') return this.chime(990);
+      if (name === 'win') return this.chime(660);
+      if (S[name]) this.blip(...S[name]);
+    },
+    // iOS suspends audio after the screen locks; background tabs should go quiet
+    wake() { if (this.ac && this.ac.state === 'suspended' && !document.hidden) this.ac.resume(); },
+    sleep() { if (this.ac && this.ac.state === 'running') this.ac.suspend(); },
     toggle() {
       this.muted = !this.muted;
       if (this.master) this.master.gain.value = this.muted ? 0 : 0.8;
@@ -335,7 +390,15 @@
 
   function updateHud() {
     $('clues').textContent = `Clues ${state.found.size} / ${CLUES.length}`;
-    $('lantern').innerHTML = [0, 1, 2].map(i => `<i class="${i < state.lantern ? 'on' : ''}"></i>`).join('');
+    $('lantern').innerHTML = Array.from({ length: state.maxLantern }, (_, i) => `<i class="${i < state.lantern ? 'on' : ''}"></i>`).join('');
+    const prizes = $('prize-list');
+    prizes.innerHTML = '';
+    for (const g of Carnival.GAMES) {
+      const li = document.createElement('li'), pz = FAIR.prizes[g.id];
+      if (state.prizes.has(g.id)) li.innerHTML = `<b>${pz.title}</b><span>${pz.note}</span>`;
+      else { li.className = 'unknown'; li.innerHTML = `<b>${Minigames.title(g.id)}</b><span>Not yet won.</span>`; }
+      prizes.appendChild(li);
+    }
     const q = state.quest, n = q.cells.size;
     $('cells').hidden = !q.met;
     $('cells').textContent = q.done ? 'Bone Buster' : `Energy Cells ${n} / 3`;
@@ -366,7 +429,7 @@
 
   function toggleJournal(force) {
     const open = force ?? !$('journal').classList.contains('show');
-    if (open && state.mode !== 'play') return;
+    if (state.mode !== (open ? 'play' : 'journal')) return; // only opens from play, only closes itself
     $('journal').classList.toggle('show', open);
     state.mode = open ? 'journal' : 'play';
   }
@@ -399,8 +462,69 @@
     dlg.speaker = 'bones';
   }
 
+  function talkBarker() {
+    const n = state.prizes.size;
+    if (!state.fairMet) { state.fairMet = true; openDialog(FAIR.barker, FAIR.meet); }
+    else if (n === 5 && !state.ticket) {
+      state.ticket = true; Audio.chime(880);
+      openDialog(FAIR.barker, FAIR.ticket, () => toast('Golden ticket: ride the wheel'));
+    } else if (state.ticket) openDialog(FAIR.barker, [FAIR.after]);
+    else openDialog(FAIR.barker, [FAIR.progress(n)]);
+    dlg.speaker = 'barker';
+  }
+
+  function playBooth(id) {
+    const pz = FAIR.prizes[id];
+    state.mode = 'mini';
+    document.body.classList.add('mini-open');
+    Minigames.open(id, {
+      prize: `You take home ${pz.name}. ${pz.note}`,
+      sfx: name => Audio.booth(name),
+      onWin: () => {
+        const first = !state.prizes.has(id);
+        state.prizes.add(id);
+        if (first) updateHud();
+        return first;
+      },
+      onClose: () => {
+        state.mode = 'play';
+        document.body.classList.remove('mini-open');
+        if (state.prizes.size === 5 && !state.ticket) toast('Mister Lamb has something for you');
+      },
+    });
+  }
+
+  // Board the wheel in whichever gondola is at the bottom; it carries you round once.
+  function boardWheel() {
+    let best = 0, bd = 1e9;
+    for (let i = 0; i < 12; i++) {
+      const a = mod(state.wheelA + (i / 12) * P.TAU, P.TAU), d = Math.abs(a - Math.PI / 2);
+      if (d < bd) { bd = d; best = i; }
+    }
+    state.ride = { start: state.wheelA, car: best, half: false };
+    Audio.chime(520);
+  }
+
+  function updateRide() {
+    const r = state.ride;
+    if (!r) return;
+    const k = (state.wheelA - r.start) / P.TAU;
+    if (k > 0.5 && !r.half) { r.half = true; if (!state.rode) openDialog('The Wheel', FAIR.wheelRide.slice(0, 2)); }
+    if (k >= 1) {
+      state.ride = null;
+      if (!state.rode) {
+        state.rode = true; state.maxLantern = 4; state.lantern = 4; updateHud();
+        openDialog('The Wheel', FAIR.wheelRide.slice(2));
+        toast('Your lantern holds a fourth flame');
+      } else openDialog('The Wheel', [FAIR.wheelAgain]);
+    }
+  }
+
   function examine(spot) {
     if (spot.id === 'bones') return talkBones();
+    if (spot.id === 'barker') return talkBarker();
+    if (Minigames.has(spot.id)) return playBooth(spot.id);
+    if (spot.id === 'wheel') return state.ticket ? boardWheel() : openDialog('The Wheel', [FAIR.wheelClosed]);
     const s = STORY[spot.id];
     if (spot.id === 'door') {
       if (state.found.size < CLUES.length) {
@@ -444,6 +568,7 @@
     const e = ENDINGS[kind], pages = e.text.slice();
     if (state.echoes.size === ECHOES.length) pages.push(ENDINGS.understood);
     if (state.quest.done) pages.push(BONES.ending);
+    if (state.rode) pages.push(FAIR.ending);
     $('ending-title').textContent = e.title;
     $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
     $('ending').classList.add('show');
@@ -460,7 +585,7 @@
 
   function interact() {
     if (state.mode === 'dialog') return advance();
-    if (state.mode !== 'play' || state.respawning) return;
+    if (state.mode !== 'play' || state.respawning || state.ride) return;
     const s = nearestSpot();
     if (s) examine(s);
   }
@@ -512,6 +637,7 @@
   function restart() {
     state.found.clear(); state.seen.clear(); state.echoes.clear();
     state.quest = { met: false, cells: new Set(), done: false };
+    Object.assign(state, { maxLantern: 3, prizes: new Set(), fairMet: false, ticket: false, rode: false, ride: null });
     state.buster = false; state.lantern = 3; state.checkpoint = 200; state.inv = 0; state.fade = 0; state.respawning = false;
     Object.assign(player, { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1 });
     spawnShades(); shots.length = 0;
@@ -526,6 +652,7 @@
     const k = e.key.toLowerCase();
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'enter', 'tab'].includes(k)) e.preventDefault();
     if (state.mode === 'title') { if (k === 'enter' || k === ' ') begin(); return; }
+    if (state.mode === 'mini') { Minigames.key(e, true); return; }
     state.keys[k] = true;
     if (e.repeat) return;
     if (state.mode === 'dialog') {
@@ -552,9 +679,12 @@
   addEventListener('keyup', e => {
     const k = e.key.toLowerCase();
     state.keys[k] = false;
+    if (state.mode === 'mini') Minigames.key(e, false);
     if (k === 'f' || k === 'x') releaseCharge();
   });
   addEventListener('blur', () => { state.keys = {}; state.charging = false; });
+  addEventListener('pointerdown', () => Audio.wake());
+  document.addEventListener('visibilitychange', () => (document.hidden ? Audio.sleep() : Audio.wake()));
   document.addEventListener('click', e => { if (e.target.closest('#hud, #title')) e.target.blur(); });
   $('begin').onclick = begin;
   $('rotate').onclick = () => setSideways(!sidewaysPref);
@@ -593,6 +723,7 @@
   }
 
   function updatePlayer(dt) {
+    if (state.ride) return;
     const k = state.keys;
     state.inv = Math.max(0, state.inv - dt); state.lock = Math.max(0, state.lock - dt);
     let dir = 0;
@@ -630,9 +761,9 @@
 
     // gas lamps are checkpoints and rekindle the lantern
     for (const lx of World.LAMPS) {
-      if (Math.abs(player.x - lx) < 40 && !state.respawning && (state.checkpoint !== lx || state.lantern < 3)) {
-        if (state.lantern < 3) { toast('Your lantern rekindles'); Audio.chime(780); }
-        state.checkpoint = lx; state.lantern = 3; updateHud();
+      if (Math.abs(player.x - lx) < 40 && !state.respawning && (state.checkpoint !== lx || state.lantern < state.maxLantern)) {
+        if (state.lantern < state.maxLantern) { toast('Your lantern rekindles'); Audio.chime(780); }
+        state.checkpoint = lx; state.lantern = state.maxLantern; updateHud();
       }
     }
 
@@ -646,7 +777,11 @@
       if (state.fade >= 1) {
         Object.assign(player, { x: state.checkpoint, y: World.groundY(state.checkpoint), vx: 0, vy: 0, ground: true });
         state.cam = clamp(player.x - viewW * 0.42, 0, World.WORLD_W + 300 - viewW);
-        state.lantern = 3; state.respawning = false; state.inv = 1.5;
+        state.lantern = state.maxLantern; state.respawning = false; state.inv = 1.5;
+        // shades near the lamp drift back to the far end of their patrol
+        for (const sh of shades) {
+          if (sh.alive && Math.abs(sh.x - player.x) < 300) sh.x = Math.abs(sh.a - player.x) > Math.abs(sh.b - player.x) ? sh.a : sh.b;
+        }
         updateHud();
       }
     } else state.fade = Math.max(0, state.fade - dt * 0.9);
@@ -678,17 +813,39 @@
     }
   }
 
+  // A distant storm: a double flash, then thunder a moment later.
+  function updateStorm(dt) {
+    state.nextStrike -= dt; state.strikeT += dt;
+    if (state.nextStrike <= 0) {
+      state.strikeT = 0; state.nextStrike = 24 + Math.random() * 32;
+      setTimeout(() => Audio.thunder(), 900 + Math.random() * 1600);
+    }
+    const t = state.strikeT;
+    state.flash = t < 0.07 ? 1 : t < 0.16 ? 0.15 : t < 0.24 ? 0.75 : Math.max(0, 0.75 * Math.exp(-(t - 0.24) * 6));
+  }
+
   function update(dt) {
     state.t += dt;
+    updateStorm(dt);
+    state.wheelA += dt * (state.ride ? 0.45 : state.ticket ? 0.12 : 0.035);
+    updateRide();
+    Audio.calliope(state.mode === 'title' ? 0 : clamp((player.x - 5150) / 350, 0, 1));
     if (state.mode === 'play') { updatePlayer(dt); updateShades(dt); }
 
-    const camTarget = clamp(player.x - viewW * 0.42 + player.face * 70, 0, World.WORLD_W + 300 - viewW);
+    let camTarget = clamp(player.x - viewW * 0.42 + player.face * 70, 0, World.WORLD_W + 300 - viewW);
+    // the camera rises with the ghost; each layer follows by its own depth
+    const alt = Math.max(0, World.groundY(player.x) - player.y);
+    let camYTarget = Math.min(90, alt * 0.5);
+    if (state.ride) {
+      // follow the gondola up: the whole estate sinks away beneath, layer by layer
+      camTarget = (World.atDepth(Carnival.WHEEL_X, 0.8) - viewW / 2) / 0.8;
+      const a = state.wheelA + (state.ride.car / 12) * P.TAU;
+      camYTarget = clamp((470 - (300 + Math.sin(a) * 230)) * 0.9, 0, 380);
+    }
     const prevCam = state.cam;
     state.cam += (camTarget - state.cam) * Math.min(1, dt * 2.2);
     if (Math.abs(state.cam - prevCam) > 0.05) state.camDir = Math.sign(state.cam - prevCam);
-    // the camera rises with the ghost; each layer follows by its own depth
-    const alt = Math.max(0, World.groundY(player.x) - player.y);
-    state.camY += (Math.min(90, alt * 0.5) - state.camY) * Math.min(1, dt * 3);
+    state.camY += (camYTarget - state.camY) * Math.min(1, dt * 3);
 
     if (state.mode !== 'title' && Math.random() < dt * (8 + Math.abs(player.vx) * 0.05)) {
       wisps.push({ x: player.x - player.face * 10 + (Math.random() - 0.5) * 30, y: player.y - 30 - Math.random() * 40, life: 1, vx: -player.vx * 0.2 + (Math.random() - 0.5) * 10, vy: -12 - Math.random() * 14 });
@@ -1064,6 +1221,56 @@
     }
   }
 
+  function fairView() {
+    return {
+      ctx, S, cam: state.cam, camY: state.camY, viewW, t: state.t, glow,
+      lit: state.ticket, riding: !!state.ride, rideCar: state.ride ? state.ride.car : -1, wheelA: state.wheelA,
+    };
+  }
+
+  // Lightning brightens what has been drawn so far; called between layers, so the
+  // far hills flare and the near ground stays a dark silhouette.
+  function flashOver(a) {
+    if (state.flash < 0.01) return;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(150,170,255,${(a * state.flash).toFixed(3)})`;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Lamps, the ghost and the sky shimmer in the path's puddles.
+  function drawPuddles() {
+    const cy = state.camY, t = state.t;
+    for (const p of World.PUDDLES) {
+      const sx = toScreen(p.x, 1), sy = p.y + cy;
+      if (sx < -p.rx - 20 || sx > viewW + p.rx + 20) continue;
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(sx * S, sy * S, p.rx * 0.95 * S, p.ry * 0.9 * S, 0, 0, P.TAU); ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+      const streak = (img, x, a, w) => {
+        ctx.globalAlpha = a;
+        ctx.drawImage(img, (x - w / 2) * S, (sy - p.ry * 2.5) * S, w * S, p.ry * 5 * S);
+      };
+      for (const l of World.LIGHTS) {
+        if (!l.pool) continue;
+        const d = Math.abs(l.x - p.x);
+        if (d < 300) streak(glow.warm, toScreen(l.x, 1), 0.6 * (1 - d / 300) * (0.9 + Math.sin(t * 9 + l.x) * 0.1), 26);
+      }
+      const gd = Math.abs(player.x - p.x);
+      if (state.mode !== 'title' && gd < p.rx + 40) streak(glow.cool, toScreen(player.x, 1), 0.45 * (1 - gd / (p.rx + 40)), 34);
+      if (state.flash > 0.01) { ctx.globalAlpha = state.flash * 0.6; ctx.fillStyle = 'rgb(150,170,255)'; ctx.fillRect(0, 0, cv.width, cv.height); }
+      // ripples
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(180,200,255,1)'; ctx.lineWidth = S;
+      for (let i = 0; i < 2; i++) {
+        const ph = mod(t * 0.35 + i * 0.5 + p.x * 0.001, 1);
+        ctx.globalAlpha = 0.3 * (1 - ph);
+        ctx.beginPath(); ctx.ellipse((sx + (i ? 18 : -14)) * S, sy * S, (4 + ph * p.rx * 0.5) * S, (1 + ph * p.ry * 0.5) * S, 0, 0, P.TAU); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   // Animated droplets and ripples over the painted fountain.
   function drawFountain() {
     const cx = toScreen(FOUNTAIN_X, 1);
@@ -1103,8 +1310,9 @@
     ctx.globalCompositeOperation = 'lighter';
     for (const s of World.SPOTS) {
       const sx = toScreen(s.x, 1);
-      if (sx < -100 || sx > viewW + 100 || s.id === 'bones') continue;
-      const done = state.seen.has(s.id) && s.id !== 'door';
+      if (sx < -100 || sx > viewW + 100 || s.id === 'bones' || s.id === 'barker') continue;
+      if (s.id === 'wheel' && !state.ticket) continue;
+      const done = Minigames.has(s.id) ? state.prizes.has(s.id) : s.id === 'wheel' ? state.rode : state.seen.has(s.id) && s.id !== 'door';
       const pulse = 0.6 + 0.4 * Math.sin(state.t * 2.5 + s.x);
       const a = done ? 0.15 : 0.55 * pulse * (s === near ? 1.5 : 1);
       const sz = 90;
@@ -1125,11 +1333,12 @@
 
   // The interaction prompt floats above the spot, or above the ghost's head when they overlap.
   function drawPrompt(near) {
-    if (!near || state.mode !== 'play' || state.respawning) return;
+    if (!near || state.mode !== 'play' || state.respawning || state.ride) return;
     const cy = state.camY;
     const sx = toScreen(near.x, 1);
     const sy = Math.min(near.y, player.y - 165) + cy - 10 + Math.sin(state.t * 3) * 3;
-    const label = near.id === 'door' ? 'Enter' : near.id === 'bones' ? 'Talk'
+    const label = near.id === 'door' ? 'Enter' : near.id === 'bones' || near.id === 'barker' ? 'Talk'
+      : Minigames.has(near.id) ? 'Play' : near.id === 'wheel' ? (state.ticket ? 'Ride' : 'Examine')
       : STORY[near.id]?.echo ? 'Listen' : state.seen.has(near.id) ? 'Recall' : 'Examine';
     const key = document.body.classList.contains('touch') ? '✦' : 'E';
     ctx.save();
@@ -1183,7 +1392,9 @@
     }
     for (const b of shots) hole(toScreen(b.x, 1), b.y + cy, b.big ? 160 : 90, 0.7);
     for (const c of CELLS) if (!state.quest.cells.has(c.id)) hole(toScreen(c.x, 1), c.y + cy, 110, 0.6);
-    if (state.mode !== 'title') {
+    const fair = Carnival.lights(fairView());
+    for (const [x, y, r, a] of fair) hole(x, y, r, a);
+    if (state.mode !== 'title' && !state.ride) {
       const [lx, ly] = player.lantern;
       hole(toScreen(lx, 1), ly + cy, 300 * (player.flick || 1), 1);
     }
@@ -1196,16 +1407,33 @@
       const sx = toScreen(l.x, 1);
       if (sx < -l.r || sx > viewW + l.r) continue;
       bloom(l.cool ? glow.cool : glow.warm, sx, l.y + cy, l.r * 0.6 * flick(l), l.cool ? 0.22 : 0.32);
+      if (l.cone) {
+        const top = l.y + cy + 8, bot = World.groundY(l.x) + 20 + cy, w1 = l.r * 0.5;
+        const g = ctx.createLinearGradient(0, top * S, 0, bot * S);
+        g.addColorStop(0, 'rgba(255,190,110,0.2)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+        ctx.globalAlpha = flick(l); ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo((sx - 9) * S, top * S); ctx.lineTo((sx + 9) * S, top * S);
+        ctx.lineTo((sx + w1) * S, bot * S); ctx.lineTo((sx - w1) * S, bot * S); ctx.fill();
+      }
       if (l.pool) {
         const gy = World.groundY(l.x) + 22 + cy, r = l.r * 0.95 * flick(l);
         ctx.globalAlpha = 0.3;
         ctx.drawImage(glow.warm, (sx - r) * S, (gy - r * 0.16) * S, r * 2 * S, r * 0.32 * S);
       }
     }
-    if (state.mode !== 'title') {
+    for (const [x, y, r, a] of fair) bloom(glow.warm, x, y, r * 0.5, a * 0.3);
+    if (state.mode !== 'title' && !state.ride) {
       const [lx, ly] = player.lantern;
       bloom(glow.warm, toScreen(lx, 1), ly + cy, 150 * (player.flick || 1), 0.45);
       bloom(glow.cool, toScreen(player.x, 1), player.y + cy - 80, 120, 0.12);
+      // the lantern's light pooling on whatever lies below it
+      const below = surfaceBelow(player.x, player.y), h = below - ly;
+      if (h < 280) {
+        const r = 90 + h * 0.3;
+        ctx.globalAlpha = 0.4 * (1 - h / 280) * (player.flick || 1);
+        ctx.drawImage(glow.warm, (toScreen(lx, 1) - r) * S, (below + cy + 12 - r * 0.16) * S, r * 2 * S, r * 0.32 * S);
+      }
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
@@ -1215,6 +1443,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(sky.cv, 0, 0, W, Hh);
+    flashOver(0.5);
 
     // twinkling stars
     ctx.fillStyle = '#dfe8ff';
@@ -1233,26 +1462,32 @@
     layer(L.mount);
     drawFog(330, 170, 0.8, 0.12, 4);
     layer(L.far);
+    flashOver(0.22);
     drawFog(400, 170, 0.75, 0.3, 6);
     drawFlies(0.4);
     layer(L.back);
+    flashOver(0.12);
     drawBats(0, 0.5);
     drawFog(450, 160, 0.7, 0.5, 9);
     drawRays();
     layer(L.mid);
+    flashOver(0.06);
     drawBats(0.5, 1);
     drawFlies(0.66);
     drawFog(500, 140, 0.55, 0.8, 12);
     layer(L.near);
+    Carnival.drawBack(fairView());
     drawFog(535, 120, 0.35, 0.92, 14);
     layer(L.ground);
+    drawPuddles();
     drawFountain();
+    Carnival.drawFront(fairView(), state.mode === 'dialog' && dlg.speaker === 'barker' && dlg.shown < dlg.full.length, player.x < Carnival.BARKER_X);
     const near = state.mode === 'title' ? null : nearestSpot();
     drawSpots(near);
     drawCells();
     drawBones();
     drawShades();
-    if (state.mode !== 'title') { drawWisps(); drawGhost(); }
+    if (state.mode !== 'title' && !state.ride) { drawWisps(); drawGhost(); }
     drawShots();
     drawPrompt(near);
     drawFlies(1);

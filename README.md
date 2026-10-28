@@ -25,12 +25,28 @@ Four optional **echoes** linger on the grounds: pale blue memories you can liste
 - **Shades** drift along parts of the path. Each touch dims your lantern by one flame. When all three go out, you wake at the last gas lamp you passed. You can jump over shades, and passing a lamp relights your lantern.
 - **Blue Bones** rattles around in the Vane mausoleum: a robot skeleton in a battered blue helmet, an homage to a certain blue bomber. He has lost three Energy Cells. One is above the tallest headstone, one is high over the fountain (climb the basin rim, then the bowl), and one is out where the shades patrol by the cellar. Bring them back and he refits his **Bone Buster** for you. Three pellets can be on screen at once; a charged shot pierces. He also shares something he saw on the night of the feast.
 
+## The Vane Harvest Fair
+
+Past the manor's east wall lies the family's abandoned fairground: a slowly turning ferris wheel, a carousel whose horses still circle, a torn big top, a helter-skelter and a broken roller coaster. **Mister Lamb**, the ghostly barker, still runs five booths:
+
+| Booth | How to play |
+| --- | --- |
+| Duck Shoot | Hold to spray the water gun; knock down 12 ducks in 25 seconds |
+| Balloon Pop | Throw darts at swaying balloons; pop 7 with 10 darts |
+| Ring Toss | Toss rings onto bottle necks (back rows are harder); ring 3 with 10 rings |
+| Milk Cans | Knock all 6 cans off the shelf with 3 balls |
+| Star Shootout | Hold to fire 100 BBs and shoot out the red star |
+
+Aim with the mouse or a finger; on a keyboard, aim with the arrow keys and act with Space. Each prize holds a family memory and goes in the journal. Win all five and Mister Lamb punches a golden ticket for the wheel. The ride lifts you above the whole estate, and your lantern comes back with a fourth flame. Listen at the carousel for one more echo.
+
 ## How the art works
 
 Every image is painted at load time from code. There are no bitmap assets.
 
 - **Brushwork** (`src/paint.js`): bristle strokes, dab clusters for foliage and clouds, and directional fills. Each one is seeded, so a shape paints the same way every time.
 - **Depth**: seven parallax layers (mountains, far hills, back woods, mid grounds, near grounds, playfield, foreground). They shift horizontally, and vertically when you jump, each by its own depth. Atmospheric fog tints the distant layers. The far and near layers are painted at lower resolution, which blurs them like a camera's depth of field. Drifting mist bands sit between layers.
-- **Light**: a darkness pass is cut open by the ghost's swinging lantern, the gas lamps and the manor windows. Warm additive bloom, moon rays, rim light on every stroke facing the moon, and fireflies and falling leaves at several depths complete it.
+- **Light**: a darkness pass is cut open by the ghost's swinging lantern, the gas lamps and the manor windows. Warm additive bloom, moon rays with drifting dust, and rim light on every stroke facing the moon complete it. On top of that: light cones under the gas lamps, warm light pooling on the path and beneath the lantern, puddles that reflect lamps and the ghost, an animated fountain, and fireflies, bats and falling leaves at several depths.
+- **Grounding**: soft contact shadows, cast away from the moon, sit under trees, headstones, statues and buildings.
+- **Storm**: now and then distant lightning flashes. The far layers flare while the near ones stay dark silhouettes, and thunder follows a moment later.
 - **Finish**: a vignette and a linen canvas-weave texture over the whole frame.
 - **Performance**: layers are cut into 512px chunks that are painted on demand and cached (`src/world.js`). Chunks just ahead of the camera are painted in spare frame time.

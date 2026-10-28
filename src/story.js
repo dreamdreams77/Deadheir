@@ -95,6 +95,16 @@ const STORY = {
     ],
     note: 'You told Halloway you would sell the house.',
   },
+  echo_carousel: {
+    echo: true,
+    title: 'Hold On, Both of You',
+    text: [
+      'The carousel turns, though no one pushes it. Two boys sit on painted horses, and a thin young man runs alongside to catch whichever one falls.',
+      '"Hold on, Master Aldric! Master Edmund, both hands!"',
+      'It is Halloway, forty years younger, laughing.',
+    ],
+    note: 'Halloway loved you both, once.',
+  },
   door: {
     title: 'The Door of Vanehold',
     locked: 'The great door does not open for you. The house knows you do not yet understand.',
@@ -160,4 +170,35 @@ const BONES = {
   already: 'Wait. Is that... you\'re already carrying all three? Rattle me sideways! Hold still...',
   cell: 'A humming capsule, warm to the touch. It feels like it belongs to someone.',
   ending: 'In the mausoleum, a skeleton in a blue helmet raises his buster in salute.',
+};
+
+// The Vane Harvest Fair, past the manor's east wall.
+const FAIR = {
+  barker: 'Mister Lamb',
+  meet: [
+    'Step right up, step right up! Oh. A customer. It has been a long time.',
+    'Lamb\'s the name. I ran the Vane Harvest Fair, back when your father paid for the lights. The rides have rusted and the prizes are dust, but the games still play, if you have a steady hand.',
+    'Win at all five booths and I will punch you a golden ticket for the wheel.',
+  ],
+  progress: n => `${n} of 5 prizes. Keep at it! The ducks are slower than they look, and nobody wins the star on the first go.`,
+  ticket: [
+    'Five for five! I have not seen shooting like that since your father was a boy.',
+    'Here, a golden ticket. The wheel has been waiting thirty years for a rider. Climb aboard at the boarding gate.',
+  ],
+  after: 'Come back any time. We never close.',
+  wheelClosed: 'The great wheel creaks in the wind. A sign hangs from the gate: RIDE CLOSED. TICKETS FROM MR. LAMB.',
+  wheelRide: [
+    'The wheel lurches and climbs. Below you the fair shrinks to a ring of guttering bulbs.',
+    'From the top you can see all of Vanehold at once: the graveyard, the willow, the fountain, the lit windows of the house. It looks small from up here, and very dear.',
+    'When the gondola comes back down, your lantern burns brighter than before.',
+  ],
+  wheelAgain: 'The wheel turns slowly, lit for you alone.',
+  ending: 'Past the manor, the great wheel turns once more, every bulb alight, for no one at all.',
+  prizes: {
+    game_duck: { name: 'a rubber duck with one eye', title: 'Rubber Duck', note: 'Edmund won it for you when you were nine. He soaked both his sleeves doing it.' },
+    game_balloon: { name: 'a faded silk ribbon', title: 'Silk Ribbon', note: 'Lady Vesper pinned it to your coat on her first day at Vanehold. You never thanked her.' },
+    game_rings: { name: 'a bottle with a note inside', title: 'Message in a Bottle', note: 'In your father\'s hand: "For my boys, when they are grown. The house is only stones. Keep each other."' },
+    game_cans: { name: 'a tin soldier on a carved stand', title: 'Tin Soldier', note: 'Halloway carved the stand the winter you had the fever, and sat up with you every night.' },
+    game_star: { name: 'a gold star pin', title: 'Gold Star', note: 'Mister Lamb pinned it on you once and called you a crack shot. You had missed every BB.' },
+  },
 };
