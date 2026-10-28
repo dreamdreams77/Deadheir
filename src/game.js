@@ -479,6 +479,7 @@
     const open = force ?? !$('journal').classList.contains('show');
     if (state.mode !== (open ? 'play' : 'journal')) return; // only opens from play, only closes itself
     $('journal').classList.toggle('show', open);
+    document.body.classList.toggle('overlay-open', open); // the touch pad must not cover the Close button
     state.mode = open ? 'journal' : 'play';
   }
 
@@ -900,6 +901,7 @@
     $('ending-title').textContent = e.title;
     $('ending-text').innerHTML = pages.map(p => `<p>${p}</p>`).join('');
     $('ending').classList.add('show');
+    document.body.classList.add('overlay-open');
   }
 
   function nearestSpot() {
@@ -980,6 +982,7 @@
     Object.assign(player, { x: 200, y: World.groundY(200), vx: 0, vy: 0, ground: true, face: 1 });
     spawnShades(); shots.length = 0;
     $('ending').classList.remove('show');
+    document.body.classList.remove('overlay-open');
     updateHud();
     snapCam();
     state.mode = 'play';
