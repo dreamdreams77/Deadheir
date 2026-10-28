@@ -50,6 +50,7 @@
   #lantern i { width: 11px; height: 16px; border-radius: 50% 50% 45% 45%; background: rgba(240,201,135,0.15); border: 1px solid rgba(240,201,135,0.35); }
   #lantern i.on { background: radial-gradient(circle at 50% 65%, #fff1c2, #f0a84a 60%, #b8612a); box-shadow: 0 0 10px rgba(255,170,80,0.8); border-color: transparent; }
   #cells { margin-top: 8px; font-family: var(--fell); font-size: 17px; color: #8fd4ff; text-shadow: 0 0 10px rgba(120,190,255,0.6), 0 2px 6px #000; }
+  #extras { margin-top: 6px; font-family: var(--fell); font-size: 17px; color: #f0d890; text-shadow: 0 0 10px rgba(240,200,120,0.5), 0 2px 6px #000; }
   #hud .right { display: flex; gap: 10px; pointer-events: auto; }
   #hud .btn { font-size: 16px; padding: 6px 16px; }
 
@@ -86,7 +87,7 @@
   #journal ol + h3 { margin-top: 18px; }
   #journal li.unknown { opacity: 0.45; font-style: italic; }
   #journal h3 { font-family: var(--fell); font-weight: 400; font-size: 22px; margin: 18px 0 4px; }
-  #journal #side { font-size: 18px; margin: 0; line-height: 1.35; }
+  #journal #side, #journal #side2, #journal #side3, #journal #relic-count { font-size: 18px; margin: 0; line-height: 1.35; }
   #journal .btn { color: #2a2116; border-color: rgba(42,33,22,0.4); background: transparent; font-size: 17px; margin-top: 8px; }
 
   /* ending */
@@ -154,7 +155,7 @@
   <div id="stage"><canvas id="game" aria-label="Deadheir game scene"></canvas></div>
 
   <div id="hud" class="overlay">
-    <div class="left"><div id="clues">Clues 0 / 5</div><div id="lantern" aria-label="Lantern"></div><div id="cells" hidden></div></div>
+    <div class="left"><div id="clues">Clues 0 / 5</div><div id="lantern" aria-label="Lantern"></div><div id="cells" hidden></div><div id="extras" hidden></div></div>
     <div class="right">
       <button class="btn rot" id="rotate">Sideways</button>
       <button class="btn" id="journal-btn">Journal</button>
@@ -187,8 +188,15 @@
       <ol id="echo-list"></ol>
       <h3>Prizes from the fair</h3>
       <ol id="prize-list"></ol>
+      <h3>Relics of the house and beyond</h3>
+      <p id="relic-count"></p>
+      <ol id="relic-list"></ol>
       <h3>Side quest: Blue Bones</h3>
       <p id="side"></p>
+      <h3>Side quest: Old Patch's apples</h3>
+      <p id="side2"></p>
+      <h3>The carousel rings</h3>
+      <p id="side3"></p>
       <button class="btn" id="journal-close">Close</button>
     </div>
   </div>
@@ -219,6 +227,8 @@
   <script src="src/world.js"></script>
   <script src="src/story.js"></script>
   <script src="src/carnival.js"></script>
+  <script src="src/beyond.js"></script>
+  <script src="src/mansion.js"></script>
   <script src="src/minigames.js"></script>
   <script src="src/game.js"></script>
 </body>

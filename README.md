@@ -1,6 +1,8 @@
 # Deadheir
 
-A short gothic mystery told in painted 2.5D. You are the ghost of Aldric Vane, heir of Vanehold, poisoned at the harvest feast. Drift across the moonlit estate, find five clues, and name your killer at the manor door. Then decide what to do with the truth.
+A short gothic mystery told in painted 2.5D. You are the ghost of Andrew Vane, heir of Vanehold, poisoned at the harvest feast. Drift across the moonlit estate, find five clues, and name your killer at the manor door (or in the steward's study, once you can get in). Then decide what to do with the truth.
+
+The two boys are Andrew (A.C.), the ghost you play, and his brother Thomas (T.J.).
 
 **Play:** open `index.html` in a browser. No build step, no dependencies.
 
@@ -10,15 +12,16 @@ A short gothic mystery told in painted 2.5D. You are the ghost of Aldric Vane, h
 | --- | --- | --- |
 | Drift | ← → / A D | ◀ ▶ |
 | Jump (hold to glide) | Space / W / ↑ | ⤒ |
-| Examine / continue | E, Enter | ✦ |
+| Examine / continue / climb off the carousel | E, Enter | ✦ |
 | Choose an answer | 1–3, or ↑ ↓ then Enter (Esc backs out) | tap |
+| Reach for the carousel's brass ring | Space (while riding) | ⤒ |
 | Fire Bone Buster (hold to charge) | F / X | ● |
 | Journal | J | Journal button |
 | Sound | M | Sound button |
 
 ## Echoes and endings
 
-Four optional **echoes** linger on the grounds: pale blue memories you can listen to. They show what drove each suspect, and what you yourself set in motion. Once you name the killer, you choose between justice and mercy, and the ending changes with your choice and with what you heard.
+Eight optional **echoes** linger on the grounds, in the house and past the fair: pale blue memories you can listen to. They show what drove each suspect, and what you yourself set in motion. Once you name the killer, you choose between justice and mercy, and the ending changes with your choice and with what you heard.
 
 ## Hazards and the side quest
 
@@ -38,6 +41,32 @@ Past the manor's east wall lies the family's abandoned fairground: a slowly turn
 | Star Shootout | Hold to fire 100 BBs and shoot out the red star |
 
 Aim with the mouse or a finger; on a keyboard, aim with the arrow keys and act with Space. Each prize holds a family memory and goes in the journal. Win all five and Mister Lamb punches a golden ticket for the wheel. The ride lifts you above the whole estate, and your lantern comes back with a fourth flame. Listen at the carousel for one more echo.
+
+## The carousel
+
+The carousel at the fair is big enough to ride. Press **E** beside it to climb onto a horse. The ride speeds up and the calliope waltz quickens; **← →** change the pace. Every lap the ring arm offers a ring as you sweep past its side: press **Space** while it is in reach. Most are tin, some are **brass**. Three brass rings wake a music box in the house. **E** climbs back down.
+
+## Inside Vanehold
+
+The great door is no longer just where you name your killer: you can now go in. The house has two storeys and ten rooms, all painted in the same brushwork as the grounds and lit by candle, hearth and moon.
+
+- **Ground floor:** the Great Hall (with the stopped clock and the family portraits), the Dining Hall where you were poisoned, the Library, the Steward's Study and the Kitchen.
+- **Upper floor:** the gallery, the nursery with two small beds marked A.C. and T.J., Lord Vane's chamber, Lady Vesper's boudoir and the music attic. Climb or descend the grand stair with **E**; you can also step off the balcony.
+- **Spirits** still patrol the dining hall, library, nursery and boudoir. Shoot them with the Bone Buster, or jump them. Fireplaces rekindle your lantern and act as checkpoints.
+- **A locked study:** pull the brass atlas in the library to open it. Halloway's desk and the strongroom both need the Steward's Keys you found on the cellar stair. With all five clues you can accuse from his desk.
+- **Mrs. Pennywick**, the cook, hands out funeral biscuits that relight your lantern.
+- **The music box** in the attic takes three brass rings. Wake it for a waltz and a fifth lantern flame.
+- Small finds in the house and beyond are collected in the journal as **relics**.
+
+## The Hollow Reach
+
+The path now continues past the fair, through a wrought-iron gate into country that was never on the map.
+
+- **The Hall of Mirrors:** three mirrors, three visions, and then your own face.
+- **The cider orchard:** Old Patch, the scarecrow, has lost six silver Moon Apples. Climb the crates, the hay wagon, the well and the cider press to find them (each one rekindles a flame). Return all six for the boathouse key. Shades prowl by the wagon.
+- **The mirror lake and the boathouse:** the painter Robert Hale has been waiting a long time to tell you what he saw on the night of the feast.
+- **The chapel on the hill:** your father waits in the crypt. Ring the bell outside. Past the chapel is a lookout over the whole estate.
+- **Lamplight travel:** every gas lamp is a waymarker. Press **E** at a lamp to walk to any lamp you have already lit.
 
 ## How the art works
 

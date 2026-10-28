@@ -3,7 +3,7 @@
 // cached chunks that are painted on demand, so wide layers stay cheap.
 const World = (() => {
   const H = 720;
-  const WORLD_W = 8300;   // walkable playfield width (the fair lies past the manor)
+  const WORLD_W = 13800;  // walkable playfield width: graveyard, manor, fair, then the Hollow Reach
   const MAXVIEW = 1800;   // widest logical viewport we support
   const CH = 512;         // chunk width in layer pixels
   const CELL = 48;        // terrain stroke cell
@@ -764,5 +764,6 @@ const World = (() => {
   return {
     H, WORLD_W, MAXVIEW, CH, layers, L, LIGHTS, SPOTS, PLATFORMS, LAMPS, PUDDLES, groundY, drawLayer, prewarm, reset, PATH_T, PATH_B, DOOR,
     addObject, addLamp, ground, atDepth, RIM,
+    props: { headstone, angel, ironFence, lampPost, brokenColumn, urn, roses },
   };
 })();

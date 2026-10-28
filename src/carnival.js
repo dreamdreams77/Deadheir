@@ -260,7 +260,8 @@ const Carnival = (() => {
   });
   World.SPOTS.push({ id: 'wheel', x: WHEEL_X, y: 470 });
   World.SPOTS.push({ id: 'barker', x: BARKER_X, y: 450 });
-  World.SPOTS.push({ id: 'echo_carousel', x: CAROUSEL_X, y: 470 });
+  World.SPOTS.push({ id: 'echo_carousel', x: CAROUSEL_X - 235, y: 470 });
+  World.SPOTS.push({ id: 'carousel', x: CAROUSEL_X, y: 430 });
   World.addLamp(5340);
   World.addLamp(7800);
   for (const g of GAMES) World.LIGHTS.push({ x: g.x, y: groundY(g.x) - 150, r: 170, col: [255, 180, 100], flick: 0.6, pool: true });
@@ -382,52 +383,95 @@ const Carnival = (() => {
     ctx.restore();
   }
 
+  // the carousel is big enough to ride: the ghost sits on one of eight horses
+  const CAR_R = 190, CAR_UP = 330;
+  function horseAt(v, i) {
+    const cx = sx(v, CAROUSEL_X, 1), base = groundY(CAROUSEL_X) + 2 + v.camY;
+    const a = v.carA + (i / 8) * P.TAU, z = Math.sin(a);
+    const s = (0.75 + (z + 1) * 0.15) * 1.7, bob = Math.sin(v.t * (v.lit || v.carRide ? 3 : 1.2) + i * 1.3) * 14;
+    return { i, a, z, s, x: cx + Math.cos(a) * CAR_R * 0.85, y: base - 128 + z * 12 + bob, dir: Math.cos(a) > 0 ? -1 : 1 };
+  }
+  // the horse nearest the viewer, where the ghost mounts
+  function frontHorse(v) {
+    let best = 0, bz = -2;
+    for (let i = 0; i < 8; i++) { const z = Math.sin(v.carA + (i / 8) * P.TAU); if (z > bz) { bz = z; best = i; } }
+    return best;
+  }
+
   function drawCarousel(v) {
     const { ctx, S } = v;
     const cx = sx(v, CAROUSEL_X, 1), base = groundY(CAROUSEL_X) + 2 + v.camY;
-    if (cx < -220 || cx > v.viewW + 220) return;
-    const R = 120, rot = v.t * (v.lit ? 0.45 : 0.12);
+    if (cx < -320 || cx > v.viewW + 320) return;
+    const R = CAR_R, top = base - CAR_UP;
     // floor
     ctx.save();
-    ctx.setTransform(S, 0, 0, S, 0, 0); P.shadow(ctx, cx, base + 2, R * 1.4, 16, 0.55); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(S, 0, 0, S, 0, 0); P.shadow(ctx, cx, base + 2, R * 1.4, 18, 0.55); ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#3a2a22';
-    ctx.beginPath(); ctx.ellipse(cx * S, (base - 8) * S, (R + 14) * S, 24 * S, 0, 0, P.TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx * S, (base - 8) * S, (R + 18) * S, 28 * S, 0, 0, P.TAU); ctx.fill();
     ctx.fillStyle = '#5a4030';
-    ctx.beginPath(); ctx.ellipse(cx * S, (base - 14) * S, (R + 10) * S, 20 * S, 0, 0, P.TAU); ctx.fill();
-    const top = base - 190;
+    ctx.beginPath(); ctx.ellipse(cx * S, (base - 16) * S, (R + 12) * S, 23 * S, 0, 0, P.TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(184,154,90,0.5)'; ctx.lineWidth = 2 * S;
+    ctx.beginPath(); ctx.ellipse(cx * S, (base - 16) * S, (R - 4) * S, 19 * S, 0, 0, P.TAU); ctx.stroke();
     const horses = [];
-    for (let i = 0; i < 8; i++) {
-      const a = rot + (i / 8) * P.TAU, z = Math.sin(a);
-      horses.push({ i, x: cx + Math.cos(a) * R * 0.85, z, a });
-    }
+    for (let i = 0; i < 8; i++) horses.push(horseAt(v, i));
     const drawHorse = h => {
-      const s = 0.75 + (h.z + 1) * 0.15, bob = Math.sin(v.t * (v.lit ? 3 : 1.2) + h.i * 1.3) * 12;
-      const y = base - 70 - h.z * -10 + bob;
-      ctx.strokeStyle = '#b89a5a'; ctx.lineWidth = 3 * S * s;
-      ctx.beginPath(); ctx.moveTo(h.x * S, (top + 30) * S); ctx.lineTo(h.x * S, (base - 16 + h.z * 8) * S); ctx.stroke();
-      horse(ctx, S, h.x, y, s, Math.cos(h.a) > 0 ? -1 : 1, v.t * 2 + h.i, (h.z + 1) / 2);
+      ctx.strokeStyle = '#b89a5a'; ctx.lineWidth = 4 * S * h.s * 0.7;
+      ctx.beginPath(); ctx.moveTo(h.x * S, (top + 30) * S); ctx.lineTo(h.x * S, (base - 18 + h.z * 8) * S); ctx.stroke();
+      horse(ctx, S, h.x, h.y, h.s, h.dir, v.t * 2 + h.i, (h.z + 1) / 2);
+      if (v.carRide && v.riderIdx === h.i && v.rider) v.rider(h);
     };
     horses.filter(h => h.z < 0).sort((a, b) => a.z - b.z).forEach(drawHorse);
     // centre column with a cracked mirror panel
-    ctx.fillStyle = '#4a3a30'; ctx.fillRect((cx - 22) * S, (top + 20) * S, 44 * S, (base - top - 34) * S);
-    ctx.fillStyle = 'rgba(150,170,210,0.25)'; ctx.fillRect((cx - 14) * S, (top + 40) * S, 28 * S, 60 * S);
+    ctx.fillStyle = '#4a3a30'; ctx.fillRect((cx - 30) * S, (top + 20) * S, 60 * S, (base - top - 34) * S);
+    ctx.fillStyle = 'rgba(150,170,210,0.25)'; ctx.fillRect((cx - 20) * S, (top + 50) * S, 40 * S, 110 * S);
+    ctx.strokeStyle = 'rgba(8,8,16,0.6)'; ctx.lineWidth = 1.5 * S;
+    ctx.beginPath(); ctx.moveTo((cx - 6) * S, (top + 50) * S); ctx.lineTo((cx + 8) * S, (top + 110) * S); ctx.lineTo((cx - 4) * S, (top + 160) * S); ctx.stroke();
     horses.filter(h => h.z >= 0).sort((a, b) => a.z - b.z).forEach(drawHorse);
     // canopy
+    const rr = R + 30;
     ctx.fillStyle = '#5e2a2c';
-    ctx.beginPath(); ctx.moveTo((cx - R - 24) * S, (top + 24) * S); ctx.lineTo(cx * S, (top - 46) * S); ctx.lineTo((cx + R + 24) * S, (top + 24) * S); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo((cx - rr) * S, (top + 24) * S); ctx.lineTo(cx * S, (top - 60) * S); ctx.lineTo((cx + rr) * S, (top + 24) * S); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(205,190,160,0.5)';
     for (let i = 0; i < 6; i++) {
-      const x0 = cx - R - 24 + i * ((R + 24) * 2 / 6) + 8;
-      ctx.beginPath(); ctx.moveTo(cx * S, (top - 46) * S); ctx.lineTo(x0 * S, (top + 24) * S); ctx.lineTo((x0 + 14) * S, (top + 24) * S); ctx.fill();
+      const x0 = cx - rr + i * (rr * 2 / 6) + 8;
+      ctx.beginPath(); ctx.moveTo(cx * S, (top - 60) * S); ctx.lineTo(x0 * S, (top + 24) * S); ctx.lineTo((x0 + 18) * S, (top + 24) * S); ctx.fill();
     }
-    for (let i = 0; i < 12; i++) {
-      const x0 = cx - R - 24 + i * ((R + 24) * 2 / 12);
+    for (let i = 0; i < 14; i++) {
+      const x0 = cx - rr + i * (rr * 2 / 14);
       ctx.fillStyle = i % 2 ? '#d8c8a0' : '#6e2c30';
-      ctx.beginPath(); ctx.moveTo(x0 * S, (top + 22) * S); ctx.lineTo((x0 + (R + 24) * 2 / 12) * S, (top + 22) * S);
-      ctx.quadraticCurveTo((x0 + (R + 24) / 12) * S, (top + 46) * S, x0 * S, (top + 22) * S); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x0 * S, (top + 22) * S); ctx.lineTo((x0 + rr * 2 / 14) * S, (top + 22) * S);
+      ctx.quadraticCurveTo((x0 + rr / 14) * S, (top + 50) * S, x0 * S, (top + 22) * S); ctx.fill();
     }
-    for (let i = 0; i < 14; i++) bulb(v, cx - R - 20 + i * ((R + 20) * 2 / 13), top + 22, flicker(v, i + 40, v.lit), 2.4);
-    ctx.fillStyle = '#b89a5a'; ctx.beginPath(); ctx.arc(cx * S, (top - 50) * S, 6 * S, 0, P.TAU); ctx.fill();
+    for (let i = 0; i < 16; i++) bulb(v, cx - rr + 4 + i * ((rr - 4) * 2 / 15), top + 24, flicker(v, i + 40, v.lit || v.carRide), 2.6);
+    ctx.fillStyle = '#b89a5a'; ctx.beginPath(); ctx.arc(cx * S, (top - 64) * S, 7 * S, 0, P.TAU); ctx.fill();
+    ctx.restore();
+    drawRingArm(v, cx, base, top);
+  }
+
+  // the brass-ring arm beside the carousel: riders lean out and grab for it as they sweep past
+  function drawRingArm(v, cx, base, top) {
+    const { ctx, S } = v;
+    const ax = cx + CAR_R + 80, ay = top + 70;
+    ctx.save();
+    ctx.strokeStyle = '#3a2c22'; ctx.lineCap = 'round';
+    ctx.lineWidth = 9 * S; ctx.beginPath(); ctx.moveTo(ax * S, (base - 10) * S); ctx.lineTo(ax * S, ay * S); ctx.stroke();
+    ctx.lineWidth = 6 * S; ctx.beginPath(); ctx.moveTo(ax * S, ay * S); ctx.quadraticCurveTo((ax - 40) * S, (ay - 16) * S, (cx + CAR_R * 0.85 + 34) * S, (ay + 18) * S); ctx.stroke();
+    // a hanging row of dull tin rings, and the brass one when it is on offer
+    const tx = cx + CAR_R * 0.85 + 34, ty = ay + 18;
+    ctx.lineWidth = 3 * S;
+    for (let k = 0; k < 4; k++) {
+      ctx.strokeStyle = 'rgba(150,155,165,0.8)';
+      ctx.beginPath(); ctx.ellipse((tx + 16 + k * 12) * S, (ty - 6 + k * 3 + Math.sin(v.t * 2 + k) * 2) * S, 5 * S, 7 * S, 0, 0, P.TAU); ctx.stroke();
+    }
+    if (v.ring && !v.ring.taken) {
+      const sw = Math.sin(v.t * 5) * 3, ry = ty + 16 + sw;
+      ctx.strokeStyle = v.ring.brass ? '#f0c75a' : '#aeb2bc'; ctx.lineWidth = 4 * S;
+      ctx.beginPath(); ctx.ellipse(tx * S, ry * S, 9 * S, 11 * S, 0, 0, P.TAU); ctx.stroke();
+      if (v.ring.brass) {
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 + Math.sin(v.t * 8) * 0.2;
+        ctx.drawImage(v.glow.gold, (tx - 28) * S, (ry - 28) * S, 56 * S, 56 * S);
+      }
+    }
     ctx.restore();
   }
 
@@ -510,13 +554,13 @@ const Carnival = (() => {
     const ws = sx(v, atDepth(WHEEL_X, WHEEL_F), WHEEL_F);
     if (ws > -300 && ws < v.viewW + 300) out.push([ws, WHEEL_HUB_Y + v.camY * WHEEL_F, v.lit ? 300 : 120, v.lit ? 0.8 : 0.3]);
     const cs = sx(v, CAROUSEL_X, 1);
-    if (cs > -200 && cs < v.viewW + 200) out.push([cs, groundY(CAROUSEL_X) - 120 + v.camY, v.lit ? 220 : 120, v.lit ? 0.8 : 0.4]);
+    if (cs > -200 && cs < v.viewW + 200) out.push([cs, groundY(CAROUSEL_X) - 150 + v.camY, v.lit || v.carRide ? 300 : 170, v.lit || v.carRide ? 0.85 : 0.45]);
     if (v.riding) { const [rx, ry] = rideCarPos(v); out.push([rx, ry, 200, 1]); }
     return out;
   }
 
   return {
-    X0, X1, GAMES, BARKER_X, WHEEL_X, CAROUSEL_X,
+    X0, X1, GAMES, BARKER_X, WHEEL_X, CAROUSEL_X, CAR_R, horseAt, frontHorse,
     near: x => x > X0 - 200,
     drawBack(v) { drawWheel(v); },
     drawFront(v, barkerTalking, barkerFaceLeft) { drawStrings(v); drawArchBulbs(v); drawCarousel(v); drawBarker(v, barkerTalking, barkerFaceLeft); },
