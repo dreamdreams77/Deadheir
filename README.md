@@ -31,6 +31,8 @@ Every image is painted at load time from code. There are no bitmap assets.
 
 - **Brushwork** (`src/paint.js`): bristle strokes, dab clusters for foliage and clouds, and directional fills. Each one is seeded, so a shape paints the same way every time.
 - **Depth**: seven parallax layers (mountains, far hills, back woods, mid grounds, near grounds, playfield, foreground). They shift horizontally, and vertically when you jump, each by its own depth. Atmospheric fog tints the distant layers. The far and near layers are painted at lower resolution, which blurs them like a camera's depth of field. Drifting mist bands sit between layers.
-- **Light**: a darkness pass is cut open by the ghost's swinging lantern, the gas lamps and the manor windows. Warm additive bloom, moon rays, rim light on every stroke facing the moon, and fireflies and falling leaves at several depths complete it.
+- **Light**: a darkness pass is cut open by the ghost's swinging lantern, the gas lamps and the manor windows. Warm additive bloom, moon rays with drifting dust, and rim light on every stroke facing the moon complete it. On top of that: light cones under the gas lamps, warm light pooling on the path and beneath the lantern, puddles that reflect lamps and the ghost, an animated fountain, and fireflies, bats and falling leaves at several depths.
+- **Grounding**: soft contact shadows, cast away from the moon, sit under trees, headstones, statues and buildings.
+- **Storm**: now and then distant lightning flashes. The far layers flare while the near ones stay dark silhouettes, and thunder follows a moment later.
 - **Finish**: a vignette and a linen canvas-weave texture over the whole frame.
 - **Performance**: layers are cut into 512px chunks that are painted on demand and cached (`src/world.js`). Chunks just ahead of the camera are painted in spare frame time.
